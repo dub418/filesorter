@@ -4,7 +4,9 @@
 package com.resanc.filesorter;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.logging.LogManager;
@@ -25,17 +27,20 @@ public class FileSorterStarter {
 		String S;
 
 		// инициализируем логер
-		File f = new File("resources/here.txt");
-		f.createNewFile();
-		PrintWriter out = new PrintWriter(f.getAbsoluteFile());
-		out.print("text abs="+f.getAbsolutePath()+" cnc="+f.getAbsolutePath()+" log="+log);
+		File fl = new File("resources/here.txt");
+		File flog = new File("resources/logging.properties");
+		
+		InputStream ilog = new FileInputStream(flog);
+				
+		fl.createNewFile();
+		PrintWriter out = new PrintWriter(fl.getAbsoluteFile());
+		out.print("text abs="+fl.getAbsolutePath()+" cnc="+fl.getAbsolutePath()+" log="+log);
         out.close();
             
 		try {
 			LogManager.getLogManager()
-					.readConfiguration(FileSorterStarter
-							.class
-							.getResourceAsStream("resources/logging.properties"));
+					.readConfiguration(ilog);
+							//FileSorterStarter.class.getResourceAsStream("resources/logging.properties"));
 		} catch (Exception e) {
 			System.out.println("Could not setup logger configuration: " + e.getMessage()); e.printStackTrace();
 		}
