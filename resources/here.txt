@@ -1,0 +1,1 @@
+text abs=C:\git\filesorter\resources\here.txt cnc=C:\git\filesorter\resources\here.txt log=java.util.logging.Logger@33909752

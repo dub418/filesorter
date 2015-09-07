@@ -14,4 +14,10 @@
 	<natures>
 		<nature>org.eclipse.jdt.core.javanature</nature>
 	</natures>
+	<variableList>
+		<variable>
+			<name>RESOURCES</name>
+			<value>file:/C:/git/filesorter/resources</value>
+		</variable>
+	</variableList>
 </projectDescription>

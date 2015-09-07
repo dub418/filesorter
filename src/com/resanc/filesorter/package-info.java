@@ -1,8 +1,8 @@
 /**
- * 
+ * В этом пакете собраны классы для управления файлами домашнего файлового архива
  */
 /**
- * @author ydubrovskiy
+ * @author Yury
  *
  */
 package com.resanc.filesorter;
