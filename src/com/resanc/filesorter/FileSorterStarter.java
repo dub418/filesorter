@@ -27,22 +27,13 @@ public class FileSorterStarter {
 		String S;
 
 		// инициализируем логер
-		File fl = new File("resources/here.txt");
-		File flog = new File("resources/logging.properties");
-		
-		InputStream ilog = new FileInputStream(flog);
-				
-		fl.createNewFile();
-		PrintWriter out = new PrintWriter(fl.getAbsoluteFile());
-		out.print("text abs="+fl.getAbsolutePath()+" cnc="+fl.getAbsolutePath()+" log="+log);
-        out.close();
-            
+
 		try {
-			LogManager.getLogManager()
-					.readConfiguration(ilog);
-							//FileSorterStarter.class.getResourceAsStream("resources/logging.properties"));
+			LogManager.getLogManager().readConfiguration(new FileInputStream(new File("resources/logging.properties")));
 		} catch (Exception e) {
-			System.out.println("Could not setup logger configuration: " + e.getMessage()); e.printStackTrace();
+			System.out.println(
+					"Could not setup logger configuration from file resources/logging.properties: " + e.getMessage());
+			e.printStackTrace();
 		}
 
 		// заполняем картотеку
@@ -50,12 +41,10 @@ public class FileSorterStarter {
 		FSScanFileCards crd = new FSScanFileCards();
 		try {
 			crd.addToFileCards(new File("."));
-			// System.out.println( crd.toString());
 		} catch (Exception e) {
-			System.out.println("Cards not added. Message: "+e.getMessage());
-			e.printStackTrace();
+			log.warning("Cards did not add. Message: " + e.getMessage());
 		}
-		;
+
 		System.out.println("Working time is " + (System.currentTimeMillis() - workTime) + " ms.");
 
 		// инициализируем устройство для записи в БД его идентификатора и
@@ -78,12 +67,6 @@ public class FileSorterStarter {
 			if (dbs != null) {
 				dbs.closeDB();
 			}
-
-			System.out.println("Hello Would!");
-
-			System.out.println("Correction Would hello!");
-
 		}
-
 	}
 }

@@ -12,6 +12,8 @@ import java.util.Date;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
 
+import javax.swing.filechooser.FileSystemView;
+
 /**
  * Класс предназначен для хранения в памяти информации об одном файле
  * Используется при сканировании диска
@@ -29,6 +31,7 @@ public class FSFileCard {
 	private String shortName = "";
 	private String fullPath = "";
 	private long lastModification = 0;
+	private String discLabel="";
 
 	// служебные внутренние свойства класса
 	private static Logger log = Logger.getLogger(FSFileCard.class.getName());
@@ -47,7 +50,7 @@ public class FSFileCard {
 	public static final int TO_FULL_STRING_FORM = 2;
 	public static final int TO_CSV_STRING_FORM = 3;
 
-	public FSFileCard(String pth, String nm, long ln, long dt, boolean isCalc) {
+	public FSFileCard(String pth, String nm, long ln, long dt, boolean isCalc, FSDiscLabels lab) {
 		this.fullPath = pth;
 		this.shortName = nm;
 		this.fileSize = ln;
@@ -56,7 +59,16 @@ public class FSFileCard {
 			this.calculateCRC32();
 			this.checkSumCalculated = true;
 		}
-		
+		 	  //String path;
+		      
+		 	  //FileSystemView view = FileSystemView.getFileSystemView();
+		 	  //String s=fullPath.substring(0,fullPath.indexOf(File.separatorChar))+"/";
+			  //File dir = new File(s);
+			  //s = view.getSystemDisplayName(dir).trim();//like "Sys (C:)"
+			  //s = s.substring(0, s.lastIndexOf("("));
+			  //if (s==null) {this.discLabel = "";}
+			  //else {this.discLabel = s.trim();}//like "Sys"
+			  
 	}
 	
 	public String getLastModificationAsString()
@@ -67,20 +79,18 @@ public class FSFileCard {
 	    return ds;
 	}
 	
-	public Date getLastModificationAsDate()
-	{
-		
-		SimpleDateFormat sdf = new SimpleDateFormat();
-	    sdf.applyPattern("yyyy-MM-dd HH:mm:ss");
-	    String ds=sdf.format(String.valueOf(lastModification));
-	    Date dt=new Date(ds);
-	    return dt;
-	}
 	/**
 	 * @return the fileSize
 	 */
 	public long getFileSize() {
 		return fileSize;
+	}
+	
+	/**
+	 * @return the discLabel
+	 */
+	public String getDiscLabel() {
+		return discLabel;
 	}
 
 	/**
@@ -111,19 +121,19 @@ public class FSFileCard {
 	public String toString() {
 		return "FSFileCard [" + "shortName=" + shortName + ", fullPath=" + fullPath + ", fileSize=" + fileSize
 				+ ", checkSumCRC32=" + checkSumCRC32 + ", ErrStatus=" + ErrStatus + ", checkSumCalculated="
-				+ checkSumCalculated + ", lastModification=" + lastModification + "]";
+				+ checkSumCalculated + ", lastModification=" + lastModification + "discLabel-"+discLabel+"]";
 	}
 
 	public String toString(int iForm) {
 		switch (iForm) {
 		case TO_FULL_STRING_FORM:
 			return "Файл: " + shortName + "(путь: " + fullPath + ") размер: " + fileSize + " CRC32: " + checkSumCRC32
-					+ " изменен :" + new Date(this.lastModification);
+					+ " изменен:" + new Date(this.lastModification)+" метка тома:"+discLabel;
 		case TO_CSV_STRING_FORM:
 			String sep = ";";
 			return "" + this.fileSize + sep + this.checkSumCRC32 + sep + this.shortName + sep + this.lastModification
 					+ sep + this.fullPath + sep + new Date(this.lastModification) + sep + this.ErrStatus + sep
-					+ this.checkSumCalculated;
+					+ this.checkSumCalculated + sep + discLabel;
 		case TO_SHORT_STRING_FORM:
 			return "Файл: " + shortName + "(путь: " + fullPath + ") размер: " + fileSize + " изменен :"
 					+ new Date(this.lastModification);
