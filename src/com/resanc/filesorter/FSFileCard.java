@@ -59,7 +59,10 @@ public class FSFileCard {
 			this.calculateCRC32();
 			this.checkSumCalculated = true;
 		}
-		 	  //String path;
+		String dr=fullPath.substring(0,fullPath.indexOf(File.separatorChar))+"/";
+		this.discLabel=lab.getLabel(dr);
+		 	  
+			   //String path;
 		      
 		 	  //FileSystemView view = FileSystemView.getFileSystemView();
 		 	  //String s=fullPath.substring(0,fullPath.indexOf(File.separatorChar))+"/";
@@ -68,7 +71,6 @@ public class FSFileCard {
 			  //s = s.substring(0, s.lastIndexOf("("));
 			  //if (s==null) {this.discLabel = "";}
 			  //else {this.discLabel = s.trim();}//like "Sys"
-			  
 	}
 	
 	public String getLastModificationAsString()

@@ -22,6 +22,7 @@ public class FSScanFileCards {
 
 	//переменные данных картотеки файлов
     private ArrayList<FSFileCard> filesList; //список всех найденных файлов
+    private FSDiscLabels labels;
     private long counterDirectoties=0; //счетчика папок
     private long counterFiles=0; //счетчик файлов
     
@@ -40,6 +41,7 @@ public class FSScanFileCards {
     public FSScanFileCards()
     {
     	filesList=new ArrayList<FSFileCard>();
+    	labels=new FSDiscLabels();
     }
     
     public ArrayList<FSFileCard> getScanFileCards() { return filesList; };
@@ -79,7 +81,7 @@ public class FSScanFileCards {
                     //обработка для файлов   
                     if (fElem.isFile()) 
                        {
-                          FSFileCard rec = new FSFileCard(fElem.getCanonicalPath(),fElem.getName(),fElem.length(),fElem.lastModified(),this.setCheckSumCalculateON); 
+                          FSFileCard rec = new FSFileCard(fElem.getCanonicalPath(),fElem.getName(),fElem.length(),fElem.lastModified(),this.setCheckSumCalculateON, this.labels); 
                           if (!filesList.add(rec)){log.warning("Application can not add new record into file list for "+fElem.getAbsolutePath());}
                           addCounterFiles();
                           if (log.isLoggable(Level.INFO)) {log.info(getCounterFiles()+" point adds file to cards " + fElem.getAbsolutePath()+ " can=" +fElem.getCanonicalPath()+" ln="+fElem.lastModified());}

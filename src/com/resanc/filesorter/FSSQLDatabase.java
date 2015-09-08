@@ -65,7 +65,8 @@ public class FSSQLDatabase {
         				"[dtCreateRecord] TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,"+
         				"[ErrStatus] INTEGER  NULL,"+
         				"[DeviceSerial] VARCHAR(25) NULL,"+
-        				"[DeviceComment] VARCHAR(100)  NULL"+
+        				"[DeviceComment] VARCHAR(100)  NULL,"+
+        				"[DiscLabel] VARCHAR(35)  NULL"+
         				");"
         				);
 	     dbMainStmt.execute(
@@ -103,13 +104,14 @@ public class FSSQLDatabase {
 					 + sp+"isCRC32Calculated"+sp+", "
 					 + sp+"ErrStatus"+sp+", "
 					 + sp+"DeviceSerial"+sp+", "+sp+"DeviceComment"+sp+", "
-					 + sp+"dtLastModification"+sp+") VALUES("+
-					 "?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S', ? ,'unixepoch'))";
+					 + sp+"DiscLabel"+sp+", "+sp+"dtLastModification"+sp+") VALUES("+
+					 "?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S', ? ,'unixepoch'))";
 	           //sp+mf.getShortName()+sp+", "+sp+mf.getFullPath()+sp+", "+sp+mf.getFileSize()+sp+", "+sp+mf.getCheckSumCRC32()+
 	           //sp+", "+sp+mf.isCheckSumCalculated()+sp+", "+sp+ ds +sp+ ", "+sp+mf.getErrStatus()+sp+", "+sp+
 	           //sserial+sp+", "+sp+shost+sp+");";
+			log.info("prepared "+req+" start");
 			dbMainPStmt = dbMainConn.prepareStatement(req);
-			log.info("prepared");
+			log.info("prepared "+req+" ok!");
 			
 			for (FSFileCard fil : crd.getScanFileCards())
             	{
@@ -130,7 +132,8 @@ public class FSSQLDatabase {
 				dbMainPStmt.setInt(6, fil.getErrStatus());
 				dbMainPStmt.setString(7, dvc.getSerial());
 				dbMainPStmt.setString(8, dvc.getHostName());
-				dbMainPStmt.setLong(9, fil.getLastModification()/1000L);
+				dbMainPStmt.setString(9, fil.getDiscLabel());
+				dbMainPStmt.setLong(10, fil.getLastModification()/1000L);
 				dbMainPStmt.executeUpdate();
             	}
 			dbMainConn.commit();
