@@ -13,7 +13,7 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
 /**
- * @author ydubrovskiy
+ * @author yury.dubrovskiy
  *
  */
 public class FileSorterStarter {
@@ -23,7 +23,6 @@ public class FileSorterStarter {
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
 
-		// ищем все файлы по указанному пути папки
 		String S;
 
 		// инициализируем логер
@@ -31,21 +30,20 @@ public class FileSorterStarter {
 		try {
 			LogManager.getLogManager().readConfiguration(new FileInputStream(new File("resources/logging.properties")));
 		} catch (Exception e) {
-			System.out.println(
-					"Could not setup logger configuration from file resources/logging.properties: " + e.getMessage());
+			System.out.println("Error: Could not setup logger configuration from file resources/logging.properties: " + e.getMessage());
 			e.printStackTrace();
+			System.exit(0);
 		}
 
-		// заполн€ем картотеку
-		long workTime = System.currentTimeMillis();
+		// ищем все файлы по указанному пути папки и заполн€ем картотеку
+		long workTime = System.currentTimeMillis();//засекаем врем€ исполнени€
 		FSScanFileCards crd = new FSScanFileCards();
 		try {
 			crd.addToFileCards(new File("."));
 		} catch (Exception e) {
-			log.warning("Cards did not add. Message: " + e.getMessage());
+			log.severe("Error: File cards did not add to card list. Message: " + e.getMessage());
 		}
-
-		System.out.println("Working time is " + (System.currentTimeMillis() - workTime) + " ms.");
+		log.fine("Working time is " + (System.currentTimeMillis() - workTime) + " ms.");//показываем врем€ исполнени€ и скорость
 
 		// инициализируем устройство дл€ записи в Ѕƒ его идентификатора и
 		// серийного номера
