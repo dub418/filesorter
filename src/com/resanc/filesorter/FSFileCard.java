@@ -9,10 +9,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.CRC32;
-
-import javax.swing.filechooser.FileSystemView;
 
 /**
  * Класс предназначен для хранения в памяти информации об одном файле
@@ -31,7 +30,7 @@ public class FSFileCard {
 	private String shortName = "";
 	private String fullPath = "";
 	private long lastModification = 0;
-	private String discLabel="";
+	private String discLabel = "";
 
 	// служебные внутренние свойства класса
 	private static Logger log = Logger.getLogger(FSFileCard.class.getName());
@@ -57,37 +56,31 @@ public class FSFileCard {
 		this.lastModification = dt;
 		if (isCalc) {
 			this.calculateCRC32();
-			this.checkSumCalculated = true;
 		}
-		String dr=fullPath.substring(0,fullPath.indexOf(File.separatorChar))+"/";
-		this.discLabel=lab.getLabel(dr);
-		 	  
-			   //String path;
-		      
-		 	  //FileSystemView view = FileSystemView.getFileSystemView();
-		 	  //String s=fullPath.substring(0,fullPath.indexOf(File.separatorChar))+"/";
-			  //File dir = new File(s);
-			  //s = view.getSystemDisplayName(dir).trim();//like "Sys (C:)"
-			  //s = s.substring(0, s.lastIndexOf("("));
-			  //if (s==null) {this.discLabel = "";}
-			  //else {this.discLabel = s.trim();}//like "Sys"
+		String dr = fullPath.substring(0, fullPath.indexOf(File.separatorChar)) + "/";
+		this.discLabel = lab.getLabel(dr);
+		if (log.isLoggable(Level.FINE)) {
+			log.fine(this.toString());
+		}
 	}
-	
-	public String getLastModificationAsString()
-	{
+
+	/**
+	 * @return the date as a string
+	 */
+	public String getLastModificationAsString() {
 		SimpleDateFormat sdf = new SimpleDateFormat();
-	    sdf.applyPattern("yyyy-MM-dd HH:mm:ss");
-	    String ds=sdf.format(String.valueOf(lastModification));
-	    return ds;
+		sdf.applyPattern("yyyy-MM-dd HH:mm:ss");
+		String ds = sdf.format(String.valueOf(lastModification));
+		return ds;
 	}
-	
+
 	/**
 	 * @return the fileSize
 	 */
 	public long getFileSize() {
 		return fileSize;
 	}
-	
+
 	/**
 	 * @return the discLabel
 	 */
@@ -123,14 +116,14 @@ public class FSFileCard {
 	public String toString() {
 		return "FSFileCard [" + "shortName=" + shortName + ", fullPath=" + fullPath + ", fileSize=" + fileSize
 				+ ", checkSumCRC32=" + checkSumCRC32 + ", ErrStatus=" + ErrStatus + ", checkSumCalculated="
-				+ checkSumCalculated + ", lastModification=" + lastModification + "discLabel-"+discLabel+"]";
+				+ checkSumCalculated + ", lastModification=" + lastModification + ", discLabel-" + discLabel + "]";
 	}
 
 	public String toString(int iForm) {
 		switch (iForm) {
 		case TO_FULL_STRING_FORM:
 			return "Файл: " + shortName + "(путь: " + fullPath + ") размер: " + fileSize + " CRC32: " + checkSumCRC32
-					+ " изменен:" + new Date(this.lastModification)+" метка тома:"+discLabel;
+					+ " изменен:" + new Date(this.lastModification) + " метка тома:" + discLabel;
 		case TO_CSV_STRING_FORM:
 			String sep = ";";
 			return "" + this.fileSize + sep + this.checkSumCRC32 + sep + this.shortName + sep + this.lastModification
@@ -160,6 +153,7 @@ public class FSFileCard {
 				buf = new byte[fis.available()];
 			}
 
+			@SuppressWarnings("unused")
 			int bytesRead = 0;
 			while (fis.available() != 0) {
 				bytesRead = fis.read(buf);
@@ -180,10 +174,11 @@ public class FSFileCard {
 			log.warning("This file results out of memory (filename is " + fullPath + ") with error message: "
 					+ e.getMessage());
 		}
-		if (checkSumCRC32 == 0) {
-			log.warning(" STRANGE WARNING: " + this.fullPath + " Size=" + this.fileSize + " CRC=" + checkSumCRC32
+		if ((checkSumCRC32 == 0)&&(fileSize!=0)) {
+			log.warning("Strange zero checksum: " + this.fullPath + " Size=" + this.fileSize + " CRC=" + checkSumCRC32
 					+ " bufsize=" + buf.length + " Buf=" + buf.toString());
 		}
+		this.checkSumCalculated=true;
 		return this.checkSumCRC32;
 	}
 
@@ -209,3 +204,12 @@ public class FSFileCard {
 	}
 
 }
+// String path;
+
+// FileSystemView view = FileSystemView.getFileSystemView();
+// String s=fullPath.substring(0,fullPath.indexOf(File.separatorChar))+"/";
+// File dir = new File(s);
+// s = view.getSystemDisplayName(dir).trim();//like "Sys (C:)"
+// s = s.substring(0, s.lastIndexOf("("));
+// if (s==null) {this.discLabel = "";}
+// else {this.discLabel = s.trim();}//like "Sys"
