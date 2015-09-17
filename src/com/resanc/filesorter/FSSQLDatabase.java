@@ -72,10 +72,19 @@ public class FSSQLDatabase {
 				+ "[dtCreateRecord] TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL," + "[ErrStatus] INTEGER  NULL,"
 				+ "[DeviceSerial] VARCHAR(25) NULL," + "[DeviceComment] VARCHAR(100)  NULL,"
 				+ "[DiscLabel] VARCHAR(35)  NULL" + ");");
+		dbMainStmt.execute("CREATE TABLE if not exists [FilesTemp] ("
+				+ "[ShortName] VARCHAR(255)  NOT NULL,"
+				+ "[FullPath] VARCHAR(255)  NOT NULL," + "[FileSize] BIGINT NOT NULL,"
+				+ "[CheckSumCRC32] BIGINT NOT NULL," + "[isCRC32Calculated] BOOLEAN DEFAULT 'false' NOT NULL,"
+				+ "[dtLastModification] DATETIME  NULL,"
+			    + "[ErrStatus] INTEGER  NULL,"
+				+ "[DeviceSerial] VARCHAR(25) NULL," + "[DeviceComment] VARCHAR(100)  NULL,"
+				+ "[DiscLabel] VARCHAR(35)  NULL" + ");");
 		dbMainStmt.execute("CREATE INDEX if not exists [SearchFileSizeCRC32] ON [Files](" + "[FileSize]  DESC,"
 				+ "[isCRC32Calculated]  DESC" + ");");
 		dbMainStmt.execute("CREATE TABLE IF NOT EXISTS [doubles] (" + "[CheckSum] BIGINT NOT NULL,"
 				+ "[FileSize] BIGINT NOT NULL," + "[Cnt] BIGINT NOT NULL)");
+		dbMainConn.commit();//коммитим транзакцию создания таблиц
 		dbIsConnected = true;
 		log.info("Database connects and tables creates Ok in " + dbFilename);
 	}// constructor
@@ -135,6 +144,35 @@ public class FSSQLDatabase {
 					"Application can not write file cards to database because database connection disable or null params for call.");
 		}
 	}// writeToDB
+	
+	public void dedupDB() throws SQLException
+	{
+		if ((dbIsConnected)) {
+			String sp = "\"";
+			dbMainStmt.execute("DELETE FROM "+sp+"FilesTemp"+sp+";");
+			String req = "INSERT INTO " + sp + "FilesTemp" + sp + "(" + sp + "ShortName" + sp + ", " + sp + "FullPath" + sp
+					+ ", " + sp + "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", " + sp + "isCRC32Calculated"
+					+ sp + ", " + sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial" + sp + ", " + sp + "DeviceComment"
+					+ sp + ", " + sp + "DiscLabel" + sp + ", " + sp + "dtLastModification" + sp + ") "
+							+"SELECT DISTINCT " + sp + "ShortName" + sp + ", " + sp + "FullPath" + sp + ", " + sp + "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", " + sp + "isCRC32Calculated"
+							+ sp + ", " + sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial" + sp + ", " + sp + "DeviceComment" + sp + ", " + sp + "DiscLabel" + sp + ", " + sp + "dtLastmodification" + sp + " from " + sp + "FILES" + sp;//-- + ";";
+			if (log.isLoggable(Level.FINE)) {
+				log.fine("prepared follow request {" + req + "}");
+			}
+			dbMainPStmt = dbMainConn.prepareStatement(req);
+				dbMainPStmt.executeUpdate();
+				if (log.isLoggable(Level.FINE)) {
+					log.fine("prepared request for {" + req + "} has worked ok!");
+				}
+			
+			dbMainConn.commit();
+		} // if
+		else {
+			log.warning(
+					"Application can not deduplicate records because database connection disable.");
+		}
+		
+	}// dedup
 	/*
 	 * примеры
 	 * 
