@@ -20,16 +20,18 @@ public class FileSorterStarter {
 
 	// служебные внутренние свойства класса
 	private static Logger log = Logger.getLogger(FileSorterStarter.class.getName());
-	public static String version = "0.01 / 2015-09-16";
+	public static String version = "0.02 / 2015-09-19";
 
 	private static void prn(final String s) {
 		System.out.println(s);
 	}
 
-	private static void hlpScreen() {
+	private static void hlpScreen(int i) {
 		prn("=============================================================================");
 		prn("                        File Sorter for home file archives                   ");
 		prn("                        Version: " + version);
+		if (i==1){
+		prn("ERROR! INCORRECT PARAMETER(S) IN COMMAND LINE!");}
 		prn("Start format:   Java -jar FileSorterStarter -<Param> <Path>                  ");
 		prn("                                                                             ");
 		prn("                <Param> - command parameter one of follow:                   ");
@@ -66,6 +68,7 @@ public class FileSorterStarter {
 			e.printStackTrace();
 			System.exit(0);
 		}
+		long viparam=0; //визуальный показатель, сколько строк обработала команда
 		FSMetrics metr = new FSMetrics();// временная метрика
 		FSMetrics totl = new FSMetrics(); // полное время выполнения программы
 		FSScanFileCards crd = new FSScanFileCards(false);
@@ -95,7 +98,8 @@ public class FileSorterStarter {
 				}
 				metr.getTime("Deduplicate database file", 0, "");
 			} // -----------dedup-------------
-break;
+			else { hlpScreen(1); System.exit(0);}
+			break;
 		case 2: // service function with path params
 			startStringWrite(args);
 			if (args[0].toUpperCase().trim().equals("-SCAN")) {
@@ -129,20 +133,45 @@ break;
 					}
 				}
 				metr.getTime("Writing cards to database file", crd.getCounterFiles(), "files");
+				viparam = crd.getCounterFiles();
 			} // -----------scan-------------
-
+			else if (args[0].toUpperCase().trim().equals("-MERGE")) {
+				// удаляем из базы дублирующие строки
+				// Создаем новую базу
+				FSSQLDatabase dbs = null;
+				long li=0;
+				try {
+					dbs = new FSSQLDatabase("database.s3db");
+					try {
+						li=dbs.mergeFromDB(args[1]);
+					} catch (Exception e) {
+						log.warning("Cannot merge in DB. Message: " + e.getMessage());
+					}
+				} catch (Exception e) {
+					log.warning("Cannot open connect to main DB for merging. Message: " + e.getMessage());
+				} finally {
+					if (dbs != null) {
+						dbs.closeDB();
+					}
+				}
+				metr.getTime("Data merged "+li+"rows to database file from "+args[1], li, "rows");
+				viparam = li;
+			} // ---------merge-------
+			else { hlpScreen(1); System.exit(0);}
 			break;
 		default:
-			hlpScreen();
+			hlpScreen(0);
 			System.exit(0); // Show Help Screen
 		}
 		metr.getTime(null, 0, "");
-		if (args.length==1)
-		{System.out.println("Application finished with params: [" + args[0] + "] "
-				+ totl.getTime("total time", 1, "program") + " msec.");}
-		if (args.length==2)
-		{System.out.println("Application finished with params: [" + args[0] + "] [" + args[1] + "] "
-				+ totl.getTime("total time", 1, "program") + " msec." + crd.getCounterFiles() + " files.");}
-		
+		if (args.length == 1) {
+			System.out.println("Application finished with params: [" + args[0] + "] "
+					+ totl.getTime("total time", 1, "program") + " msec.");
+		}
+		if (args.length == 2) {
+			System.out.println("Application finished with params: [" + args[0] + "] [" + args[1] + "] "
+					+ totl.getTime("total time", 1, "program") + " msec." + viparam + " files.");
+		}
+
 	}
 }
