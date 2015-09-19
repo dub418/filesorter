@@ -30,8 +30,7 @@ public class FileSorterStarter {
 		prn("=============================================================================");
 		prn("                        File Sorter for home file archives                   ");
 		prn("                        Version: " + version);
-		if (i==1){
-		prn("ERROR! INCORRECT PARAMETER(S) IN COMMAND LINE!");}
+		if (i == 1) {prn("ERROR! INCORRECT PARAMETER(S) IN COMMAND LINE!");}
 		prn("Start format:   Java -jar FileSorterStarter -<Param> <Path>                  ");
 		prn("                                                                             ");
 		prn("                <Param> - command parameter one of follow:                   ");
@@ -68,7 +67,8 @@ public class FileSorterStarter {
 			e.printStackTrace();
 			System.exit(0);
 		}
-		long viparam=0; //визуальный показатель, сколько строк обработала команда
+		long viparam = 0; // визуальный показатель, сколько строк обработала
+							// команда
 		FSMetrics metr = new FSMetrics();// временная метрика
 		FSMetrics totl = new FSMetrics(); // полное время выполнения программы
 		FSScanFileCards crd = new FSScanFileCards(false);
@@ -98,7 +98,10 @@ public class FileSorterStarter {
 				}
 				metr.getTime("Deduplicate database file", 0, "");
 			} // -----------dedup-------------
-			else { hlpScreen(1); System.exit(0);}
+			else {
+				hlpScreen(1);
+				System.exit(0);
+			}
 			break;
 		case 2: // service function with path params
 			startStringWrite(args);
@@ -139,11 +142,11 @@ public class FileSorterStarter {
 				// удаляем из базы дублирующие строки
 				// Создаем новую базу
 				FSSQLDatabase dbs = null;
-				long li=0;
+				long li = 0;
 				try {
 					dbs = new FSSQLDatabase("database.s3db");
 					try {
-						li=dbs.mergeFromDB(args[1]);
+						li = dbs.mergeFromDB(args[1]);
 					} catch (Exception e) {
 						log.warning("Cannot merge in DB. Message: " + e.getMessage());
 					}
@@ -154,10 +157,13 @@ public class FileSorterStarter {
 						dbs.closeDB();
 					}
 				}
-				metr.getTime("Data merged "+li+"rows to database file from "+args[1], li, "rows");
+				metr.getTime("Data merged " + li + "rows to database file from " + args[1], li, "rows");
 				viparam = li;
 			} // ---------merge-------
-			else { hlpScreen(1); System.exit(0);}
+			else {
+				hlpScreen(1);
+				System.exit(0);
+			}
 			break;
 		default:
 			hlpScreen(0);
