@@ -1,8 +1,11 @@
 /**
- * 
+ * Пакет работы с файлами домашнего архива
  */
 package com.resanc.filesorter;
 
+import java.io.IOException;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -12,6 +15,13 @@ import java.sql.Statement;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * База данных SQLite, в которой хранится и обрабатывается информация о файлах
@@ -30,6 +40,7 @@ public class FSSQLDatabase {
 	private static String dbFilename = "filesorterbase.s3db";
 	private static String dbJDBCClassname = "org.sqlite.JDBC";
 	private static String dbJDBCname = "jdbc:sqlite:";
+	public static String dbMainTableName = "Files1";
 	private static Connection dbMainConn;
 	private static Statement dbMainStmt;
 	private static PreparedStatement dbMainPStmt;
@@ -64,28 +75,52 @@ public class FSSQLDatabase {
 															// временного буфера
 															// в память
 		dbMainStmt.execute("PRAGMA temp_store=MEMORY");
-		dbMainStmt.execute("CREATE TABLE if not exists [Files] ("
+		dbMainStmt.execute("CREATE TABLE if not exists [" + dbMainTableName + "] ("
 				+ "[FileID] INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," + "[ShortName] VARCHAR(255)  NOT NULL,"
 				+ "[FullPath] VARCHAR(255)  NOT NULL," + "[FileSize] BIGINT NOT NULL,"
 				+ "[CheckSumCRC32] BIGINT NOT NULL," + "[isCRC32Calculated] BOOLEAN DEFAULT 'false' NOT NULL,"
 				+ "[dtLastModification] DATETIME  NULL,"
 				+ "[dtCreateRecord] TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL," + "[ErrStatus] INTEGER  NULL,"
 				+ "[DeviceSerial] VARCHAR(25) NULL," + "[DeviceComment] VARCHAR(100)  NULL,"
-				+ "[DiscLabel] VARCHAR(35)  NULL" + ");");
+				+ "[DiscLabel] VARCHAR(35)  NULL," + "[FileExt] VARCHAR(35)  NULL" + ");");
 		dbMainStmt.execute("CREATE TABLE if not exists [FilesTemp] (" + "[ShortName] VARCHAR(255)  NOT NULL,"
 				+ "[FullPath] VARCHAR(255)  NOT NULL," + "[FileSize] BIGINT NOT NULL,"
 				+ "[CheckSumCRC32] BIGINT NOT NULL," + "[isCRC32Calculated] BOOLEAN DEFAULT 'false' NOT NULL,"
 				+ "[dtLastModification] DATETIME  NULL," + "[ErrStatus] INTEGER  NULL,"
 				+ "[DeviceSerial] VARCHAR(25) NULL," + "[DeviceComment] VARCHAR(100)  NULL,"
-				+ "[DiscLabel] VARCHAR(35)  NULL" + ");");
-		dbMainStmt.execute("CREATE INDEX if not exists [SearchFileSizeCRC32] ON [Files](" + "[FileSize]  DESC,"
-				+ "[isCRC32Calculated]  DESC" + ");");
+				+ "[DiscLabel] VARCHAR(35)  NULL," + "[FileExt] VARCHAR(35)  NULL" + ");");
+		dbMainStmt.execute("CREATE INDEX if not exists [SearchFileSizeCRC32] ON [" + dbMainTableName + "]("
+				+ "[FileSize]  DESC," + "[isCRC32Calculated]  DESC" + ");");
 		dbMainStmt.execute("CREATE TABLE IF NOT EXISTS [doubles] (" + "[CheckSum] BIGINT NOT NULL,"
 				+ "[FileSize] BIGINT NOT NULL," + "[Cnt] BIGINT NOT NULL)");
+		dbMainStmt.execute("CREATE TABLE if not exists [StatExt] (" + "[FileExt] VARCHAR(255) NULL,"
+				+ "[FullPath] VARCHAR(255)  NOT NULL, [CNT] BIGINT NULL);");
+		dbMainStmt.execute("CREATE TABLE if not exists [prefPaths] (" + "[Ext] VARCHAR(255) NULL,"
+				+ "[FullPath] VARCHAR(255)  NOT NULL);");
 		dbMainConn.commit();// коммитим транзакцию создания таблиц
 		dbIsConnected = true;
 		log.info("Database connects and tables creates Ok in " + dbFilename);
 	}// constructor
+
+	public static String getExt(String str) {
+		String sufix = "";
+		try {
+			Pattern p = Pattern.compile("\\.\\w+$");
+			Matcher matcher;
+			matcher = p.matcher(str);
+			matcher.find();
+			sufix = matcher.group();
+			if (sufix == null) {
+				sufix = "";
+			}
+		} catch (Exception e) {
+			if (log.isLoggable(Level.FINE)) {
+				log.fine("No dot in filename so no EXT for str=[" + str + "] sufix=[" + sufix + "] Message:"
+						+ e.getMessage());
+			}
+		}
+		return sufix.toLowerCase();
+	}
 
 	public void closeDB() throws SQLException {
 		if (dbIsConnected) {
@@ -109,16 +144,20 @@ public class FSSQLDatabase {
 	public void writeToDB(FSScanFileCards crd, FSDeviceWinInfo dvc) throws SQLException {
 		if ((dbIsConnected) && (crd != null) && (dvc != null)) {
 			String sp = "\"";
-			String req = "INSERT INTO " + sp + "Files" + sp + "(" + sp + "ShortName" + sp + ", " + sp + "FullPath" + sp
-					+ ", " + sp + "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", " + sp + "isCRC32Calculated"
-					+ sp + ", " + sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial" + sp + ", " + sp + "DeviceComment"
-					+ sp + ", " + sp + "DiscLabel" + sp + ", " + sp + "dtLastModification" + sp + ") VALUES("
-					+ "?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S', ? ,'unixepoch'))";
+			String req = "INSERT INTO " + sp + dbMainTableName + sp + "(" + sp + "ShortName" + sp + ", " + sp
+					+ "FullPath" + sp + ", " + sp + "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", " + sp
+					+ "isCRC32Calculated" + sp + ", " + sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial" + sp + ", "
+					+ sp + "DeviceComment" + sp + ", " + sp + "DiscLabel" + sp + ", " + sp + "FileExt" + sp + ", " + sp
+					+ "dtLastModification" + sp + ") VALUES("
+					+ "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S', ? ,'unixepoch'))";
+			if (log.isLoggable(Level.FINE)) {
+				log.fine("prepares follow request {" + req + "}");
+			}
 			dbMainPStmt = dbMainConn.prepareStatement(req);
 			if (log.isLoggable(Level.FINE)) {
-				log.fine("prepared request {" + req + "} has worked ok!");
+				log.fine("prepared request {" + req + "} has prepared in DB ok!");
 			}
-
+			long ll = 0;
 			for (FSFileCard fil : crd.getScanFileCards()) {
 				dbMainPStmt.setString(1, fil.getShortName());
 				dbMainPStmt.setString(2, fil.getFullPath());
@@ -129,19 +168,79 @@ public class FSSQLDatabase {
 				dbMainPStmt.setString(7, dvc.getSerial());
 				dbMainPStmt.setString(8, dvc.getHostName());
 				dbMainPStmt.setString(9, fil.getDiscLabel());
-				dbMainPStmt.setLong(10, fil.getLastModification() / 1000L);
-				dbMainPStmt.executeUpdate();
+				dbMainPStmt.setString(10, FSSQLDatabase.getExt(fil.getShortName()));
+				dbMainPStmt.setLong(11, fil.getLastModification() / 1000L);
+				try {
+					dbMainPStmt.executeUpdate();
+				} catch (Exception e) {
+					log.severe("ERROR UPDATE! " + e.getMessage() + " | " + e.getLocalizedMessage());
+				}
 				if (log.isLoggable(Level.FINE)) {
-					log.fine("prepared request for {" + fil.toString(fil.TO_FULL_STRING_FORM) + "} has worked ok!");
+					log.fine(ll++ + "." + FSSQLDatabase.getExt(fil.getShortName()) + ". prepared request for {"
+							+ fil.toString(fil.TO_FULL_STRING_FORM) + "} has worked ok!");
 				}
 			}
-			dbMainConn.commit();
+			try {
+				dbMainConn.commit();
+			} catch (Exception e) {
+				log.severe("ERROR COMMIT! " + e.getMessage() + " | " + e.getLocalizedMessage());
+			}
+
 		} // if
 		else {
 			log.warning(
 					"Application can not write file cards to database because database connection disable or null params for call.");
 		}
 	}// writeToDB
+
+	public void readExtentionsDB() throws SQLException, JsonGenerationException, JsonProcessingException, IOException {
+		// select distinct substr(shortname,instr(shortname,".")) as s,
+		// count(shortname) from filestemp where length(s)<25 group by s;
+		// select distinct substr(fullpath,1,instr(fullpath,shortname)-2) as
+		// subdir , substr(shortname,instr(shortname,".")) as ext,
+		// count(shortname) from filestemp where length(ext)<25 group by subdir;
+		//select fullpath, fileext, count(fileext) as cnt from files1 group by fullpath,fileext order by cnt desc;
+		if ((dbIsConnected)) {
+			String sp = "\"";
+			dbMainStmt.execute("DELETE FROM " + sp + "StatExt" + sp + ";");
+			String req = "INSERT INTO " + sp + "StatExt" + sp + "(" + sp + "FullPath" + sp + ", " + sp + "FileExt"
+					+ sp + ", " + sp + "CNT" + sp + ") "  
+					+ "SELECT FullPath, FileExt, count(FileExt) as Cnt from Files1 where FileExt<>"+sp+sp+" group by FullPath,FileExt having cnt>1 order by FileExt asc, Cnt desc";
+			if (log.isLoggable(Level.FINE)) {
+				log.fine("prepared follow request for extentions {" + req + "}");
+			}
+			dbMainPStmt = dbMainConn.prepareStatement(req);
+			dbMainPStmt.executeUpdate();
+			if (log.isLoggable(Level.FINE)) {
+				log.fine("prepared request for extentions {" + req + "} has worked ok!");
+			}
+
+			dbMainConn.commit();
+			//получаем запросом из таблицы список расширений и выгружаем в json
+			dbMainRes = dbMainStmt.executeQuery("SELECT * FROM [StatExt]");
+			dbMainConn.commit();
+			while (dbMainRes.next()) {
+				String fileExt = dbMainRes.getString("FileExt");
+				String fullPath = dbMainRes.getString("FullPath");
+				long cnt = dbMainRes.getLong("CNT");
+				FSFileExtensionPath fp = new FSFileExtensionPath(fileExt, fullPath, cnt);
+				//сериализуем в json
+				ObjectMapper mapper = new ObjectMapper();
+				//mapper.
+				//DateFormat customDateFormat = new SimpleDateFormat("yyyy/dd/MM, HH:mm:ss");
+				//mapper.setDateFormat(customDateFormat);
+				 
+				Writer writer = new StringWriter();
+				mapper.writeValue(writer, fp);
+				System.out.println(fileExt+" "+fullPath+" "+cnt+" "+writer.toString());
+			}
+			
+		} // if
+		else {
+			log.warning("Application can not write StatExt table because database connection disable.");
+		}
+
+	}//readExtentionsDB
 
 	public void dedupDB() throws SQLException {
 		if ((dbIsConnected)) {
@@ -151,12 +250,13 @@ public class FSSQLDatabase {
 					+ sp + ", " + sp + "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", " + sp
 					+ "isCRC32Calculated" + sp + ", " + sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial" + sp + ", "
 					+ sp + "DeviceComment" + sp + ", " + sp + "DiscLabel" + sp + ", " + sp + "dtLastModification" + sp
-					+ ") " + "SELECT DISTINCT " + sp + "ShortName" + sp + ", " + sp + "FullPath" + sp + ", " + sp
-					+ "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", " + sp + "isCRC32Calculated" + sp + ", "
-					+ sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial" + sp + ", " + sp + "DeviceComment" + sp + ", "
-					+ sp + "DiscLabel" + sp + ", " + sp + "dtLastmodification" + sp + " from " + sp + "FILES" + sp;// --
-																													// +
-																													// ";";
+					+ ", " + sp + "FileExt" + sp + ") " + "SELECT DISTINCT " + sp + "ShortName" + sp + ", " + sp
+					+ "FullPath" + sp + ", " + sp + "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", " + sp
+					+ "isCRC32Calculated" + sp + ", " + sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial" + sp + ", "
+					+ sp + "DeviceComment" + sp + ", " + sp + "DiscLabel" + sp + ", " + sp + "dtLastmodification" + sp
+					+ ", " + sp + "FileExt" + sp + " from " + sp + dbMainTableName + sp;// --
+			// +
+			// ";";
 			if (log.isLoggable(Level.FINE)) {
 				log.fine("prepared follow request {" + req + "}");
 			}
@@ -178,7 +278,7 @@ public class FSSQLDatabase {
 		if ((dbIsConnected)) {
 			long cnt = 0;
 			if (fnDif.equals(null) || fnDif.equals("")) {
-				log.warning("Can not merge with null or empty file neme of DB.");
+				log.warning("Can not merge with null or empty file name of DB.");
 			} else {
 				Connection connDif = null;
 				try {
@@ -211,25 +311,25 @@ public class FSSQLDatabase {
 																	// буфера в
 																	// память
 					statmtDif.execute("PRAGMA temp_store=MEMORY");
-					resSetDif = statmtDif.executeQuery("SELECT * FROM files");
+					resSetDif = statmtDif.executeQuery("SELECT * FROM [" + dbMainTableName + "]");
 					connDif.commit();
 				} catch (SQLException ex) {
-					log.severe("Select * from files. Error with message: " + ex.getMessage());
+					log.severe("Select * from " + dbMainTableName + ". Error with message: " + ex.getMessage());
 					if (connDif != null) {
 						connDif.close();
 					}
 					closeDB();
-					System.out.println("Error select * from files.");
+					System.out.println("Error select * from " + dbMainTableName);
 					System.exit(0);
 				}
 				// готовим запрос на вставку в prepare insert
 				try {
-					req = "INSERT INTO " + sp + "Files" + sp + "(" + sp + "ShortName" + sp + ", " + sp + "FullPath" + sp
-							+ ", " + sp + "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", " + sp
-							+ "isCRC32Calculated" + sp + ", " + sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial" + sp
-							+ ", " + sp + "DeviceComment" + sp + ", " + sp + "DiscLabel" + sp + ", " + sp
-							+ "dtLastModification" + sp + ", " + sp + "dtCreateRecord" + sp + ") VALUES("
-							+ "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+					req = "INSERT INTO " + sp + dbMainTableName + sp + "(" + sp + "ShortName" + sp + ", " + sp
+							+ "FullPath" + sp + ", " + sp + "FileSize" + sp + ", " + sp + "CheckSumCRC32" + sp + ", "
+							+ sp + "isCRC32Calculated" + sp + ", " + sp + "ErrStatus" + sp + ", " + sp + "DeviceSerial"
+							+ sp + ", " + sp + "DeviceComment" + sp + ", " + sp + "DiscLabel" + sp + ", " + sp
+							+ "dtLastModification" + sp + ", " + sp + "dtCreateRecord" + sp + ", " + sp + "FileExt" + sp
+							+ ") VALUES(" + "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 					dbMainPStmt = dbMainConn.prepareStatement(req);
 					if (log.isLoggable(Level.FINE)) {
 						log.fine("prepared request {" + req + "} sent.");
@@ -258,6 +358,7 @@ public class FSSQLDatabase {
 						String deviceSerial = resSetDif.getString("DeviceSerial");
 						String deviceComment = resSetDif.getString("DeviceComment");
 						String discLabel = resSetDif.getString("DiscLabel");
+						String fileExt = getExt(shortName);// ;resSetDif.getString("DiscLabel");
 
 						dbMainPStmt.setString(1, shortName);
 						dbMainPStmt.setString(2, fullPath);
@@ -270,6 +371,7 @@ public class FSSQLDatabase {
 						dbMainPStmt.setString(9, discLabel);
 						dbMainPStmt.setString(10, dtLastModification);
 						dbMainPStmt.setString(11, dtCreateRecord);
+						dbMainPStmt.setString(12, fileExt);
 						dbMainPStmt.executeUpdate();
 						cnt++;
 						if (log.isLoggable(Level.FINE)) {

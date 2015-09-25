@@ -190,9 +190,22 @@ public class FSFileCard {
 	}
 
 	/**
+	 * Returns path only without filename
 	 * @return the fullPath
 	 */
 	public String getFullPath() {
+		int ls = fullPath.lastIndexOf(File.separator);
+		String pth = fullPath;
+		if (ls>=0) {pth = fullPath.substring(0, ls+1);}
+		//System.out.println(ls+" ["+fullPath+"] path is ["+pth+"]");
+		return pth;
+	}
+	
+	/**
+	 * Returns full path with filename
+	 * @return the fullName
+	 */
+	public String getFullName() {
 		return fullPath;
 	}
 
