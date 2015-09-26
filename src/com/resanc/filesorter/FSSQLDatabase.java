@@ -3,6 +3,8 @@
  */
 package com.resanc.filesorter;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -12,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,6 +41,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class FSSQLDatabase {
 
 	private static String dbFilename = "filesorterbase.s3db";
+	private static String dbFilenameWithoutExt = "fsdatafile";
 	private static String dbJDBCClassname = "org.sqlite.JDBC";
 	private static String dbJDBCname = "jdbc:sqlite:";
 	public static String dbMainTableName = "Files1";
@@ -49,6 +53,7 @@ public class FSSQLDatabase {
 	// служебные внутренние свойства класса
 	private static Logger log = Logger.getLogger(FSSQLDatabase.class.getName());
 	private static boolean dbIsConnected = false;
+	private ArrayList<FSFileExtensionPath> extList;
 
 	/**
 	 * При создании объекта устанавливается соединение с БД или возвращается
@@ -199,13 +204,15 @@ public class FSSQLDatabase {
 		// select distinct substr(fullpath,1,instr(fullpath,shortname)-2) as
 		// subdir , substr(shortname,instr(shortname,".")) as ext,
 		// count(shortname) from filestemp where length(ext)<25 group by subdir;
-		//select fullpath, fileext, count(fileext) as cnt from files1 group by fullpath,fileext order by cnt desc;
+		// select fullpath, fileext, count(fileext) as cnt from files1 group by
+		// fullpath,fileext order by cnt desc;
 		if ((dbIsConnected)) {
 			String sp = "\"";
 			dbMainStmt.execute("DELETE FROM " + sp + "StatExt" + sp + ";");
-			String req = "INSERT INTO " + sp + "StatExt" + sp + "(" + sp + "FullPath" + sp + ", " + sp + "FileExt"
-					+ sp + ", " + sp + "CNT" + sp + ") "  
-					+ "SELECT FullPath, FileExt, count(FileExt) as Cnt from Files1 where FileExt<>"+sp+sp+" group by FullPath,FileExt having cnt>1 order by FileExt asc, Cnt desc";
+			String req = "INSERT INTO " + sp + "StatExt" + sp + "(" + sp + "FullPath" + sp + ", " + sp + "FileExt" + sp
+					+ ", " + sp + "CNT" + sp + ") "
+					+ "SELECT FullPath, FileExt, count(FileExt) as Cnt from Files1 where FileExt<>" + sp + sp
+					+ " group by FullPath,FileExt having cnt>1 order by FileExt asc, Cnt desc";
 			if (log.isLoggable(Level.FINE)) {
 				log.fine("prepared follow request for extentions {" + req + "}");
 			}
@@ -216,31 +223,33 @@ public class FSSQLDatabase {
 			}
 
 			dbMainConn.commit();
-			//получаем запросом из таблицы список расширений и выгружаем в json
+			// получаем запросом из таблицы список расширений и выгружаем в json
 			dbMainRes = dbMainStmt.executeQuery("SELECT * FROM [StatExt]");
 			dbMainConn.commit();
+
+			// заносим в массив все расширения из запроса к БД
+			extList = new ArrayList<FSFileExtensionPath>();
 			while (dbMainRes.next()) {
 				String fileExt = dbMainRes.getString("FileExt");
 				String fullPath = dbMainRes.getString("FullPath");
 				long cnt = dbMainRes.getLong("CNT");
-				FSFileExtensionPath fp = new FSFileExtensionPath(fileExt, fullPath, cnt);
-				//сериализуем в json
-				ObjectMapper mapper = new ObjectMapper();
-				//mapper.
-				//DateFormat customDateFormat = new SimpleDateFormat("yyyy/dd/MM, HH:mm:ss");
-				//mapper.setDateFormat(customDateFormat);
-				 
-				Writer writer = new StringWriter();
-				mapper.writeValue(writer, fp);
-				System.out.println(fileExt+" "+fullPath+" "+cnt+" "+writer.toString());
+				extList.add(new FSFileExtensionPath(fileExt, fullPath, cnt));
+			} // while
+				// сериализуем в json
+			ObjectMapper mapper = new ObjectMapper();
+			// создаем файл для выгрузки
+			try {
+				File fpj = new File(dbFilenameWithoutExt + ".json");
+				mapper.writeValue(fpj, extList);
+			} catch (Exception e) {
+				log.severe("Error with serialization to JSON file. Message " + e.getMessage());
 			}
-			
-		} // if
+		} // if db
 		else {
 			log.warning("Application can not write StatExt table because database connection disable.");
 		}
 
-	}//readExtentionsDB
+	}// readExtentionsDB
 
 	public void dedupDB() throws SQLException {
 		if ((dbIsConnected)) {
@@ -444,5 +453,21 @@ public class FSSQLDatabase {
 	 * "saveToDB " +fil.fullPath); conn.WriteDBRecord(fil, sHost, sSerial);
 	 * saved++; } //for (MyFile fil : this.filesList) {
 	 * //conn.WriteDBRecord(fil, sHost, sSerial); // saved++; }//for
+	 *
+	 * 
+	 * FileWriter fw = null; try { fw = new
+	 * FileWriter(dbFilenameWithoutExt+".json", true); } catch (IOException e)
+	 * {log.severe("Can't open or create JSON file ["+dbFilenameWithoutExt+
+	 * ".json] with message "+e.getMessage());} if (fw!=null) //Writer writer =
+	 * new StringWriter(); //FSFileExtensionPath fp = new
+	 * FSFileExtensionPath(fileExt, fullPath, cnt);
+	 * 
+	 * //mapper. //DateFormat customDateFormat = new SimpleDateFormat(
+	 * "yyyy/dd/MM, HH:mm:ss"); //mapper.setDateFormat(customDateFormat);
+	 * 
+	 * //Writer writer = new StringWriter(); // //mapper.writeValue(fw, fp);
+	 * //System.out.println(//fileExt+" "+fullPath+" "+cnt+" wr="+ //
+	 * writer.toString());
+	 *
 	 */
 }
