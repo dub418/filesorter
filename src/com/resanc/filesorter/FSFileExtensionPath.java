@@ -11,6 +11,14 @@ import java.util.logging.Logger;
  */
 public class FSFileExtensionPath {
 	/**
+	 */
+	public FSFileExtensionPath() {
+		super();
+		Ext = "";
+		Path = "";
+		PriorityLevel = 0;
+	}
+	/**
 	 * @param ext
 	 * @param path
 	 */

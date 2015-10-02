@@ -25,7 +25,7 @@ public class FileSorterStarter {
 	// служебные внутренние свойства класса
 	private static Logger log = Logger.getLogger(FileSorterStarter.class.getName());
 	public static String dbName = "fsdb.s3db";
-	public static String version = "0.03 / 2015-09-23";
+	public static String version = "0.05 / 2015-09-30";
 
 	private static void prn(final String s) {
 		System.out.println(s);
@@ -36,14 +36,16 @@ public class FileSorterStarter {
 		prn("                        File Sorter for home file archives                   ");
 		prn("                        Version: " + version);
 		if (i == 1) {prn("ERROR! INCORRECT PARAMETER(S) IN COMMAND LINE!");}
-		prn("Start format:   Java -jar FileSorterStarter -<Param> <Path>                  ");
+		prn("Start format:   Java -jar FileSorterStarter -<Param> <Path> -<Option>        ");
 		prn("                                                                             ");
 		prn("      <Param> - command parameter one of follow:                             ");
 		prn("           SCAN - scaning of path directory;                                 ");
 		prn("           MERGE - merging path database file to main database file;         ");
 		prn("           DEDUP - delete copies of rows from main database file;            ");
 		prn("           EXT   - create statistics table StatExt in main database file;    ");
-		prn("           PATH  - insert prefered paths for file extensions fron JSON file; ");
+		prn("           PATH  - insert prefered paths for file extensions from JSON file; ");
+		prn("                 Option NEW - delete all previous extensions ; ");
+		prn("                 Option ADD - adds new to previous extensions; ");
 		prn("           BAT   - generate BAT-file to delete duplicates;                   ");
 		prn("                                                                             ");
 		prn("           The main database file is "+dbName);
@@ -51,12 +53,17 @@ public class FileSorterStarter {
 	}
 	
 	private static void startStringWrite(final String args[]) {
-		if (args.length > 1) {
-			System.out.println("Program started with params [" + args[0] + "] [" + args[1] + "]+ Ver." + version);
+		if (args.length > 2) {
+			System.out.println("Program started with params [" + args[0] + "] [" + args[1] +"] [" + args[2] + "] Ver." + version);
 			log.info("============================================================\r\n"
-					+ "Program started with params [" + args[0] + "] [" + args[1] + "]+ Ver." + version + "\r\n"
-					+ "==================================================================");
-		} else {
+					+ "Program started with params [" + args[0] + "] [" + args[1] + "] [" + args[2] + "] Ver." + version + "\r\n"
+					+ "==================================================================");} else
+			if (args.length > 1) {
+				System.out.println("Program started with params [" + args[0] + "] [" + args[1] + "] Ver." + version);
+				log.info("============================================================\r\n"
+						+ "Program started with params [" + args[0] + "] [" + args[1] + "] Ver." + version + "\r\n"
+						+ "==================================================================");
+			} else {
 			System.out.println("Program started with params [" + args[0] + "] Ver." + version);
 			log.info("============================================================\r\n"
 					+ "Program started with params [" + args[0] + "] Ver." + version + "\r\n"
@@ -115,9 +122,9 @@ public class FileSorterStarter {
 				try {
 					dbs = new FSSQLDatabase(dbName);
 					try {
-						dbs.readExtentionsDB();
+						dbs.readExtensionsDB();
 					} catch (Exception e) {
-						log.warning("Cannot deduplicate in DB ["+dbName+"]. Message: " + e.getMessage());
+						log.warning("Cannot read exts in DB ["+dbName+"]. Message: " + e.getMessage());
 					}
 				} catch (Exception e) {
 					log.warning("Cannot open connect to DB ["+dbName+"]. Message: " + e.getMessage());
@@ -126,7 +133,7 @@ public class FileSorterStarter {
 						dbs.closeDB();
 					}
 				}
-				metr.getTime("Read Exts in database file", 0, "");
+				metr.getTime("Read Exts in database file and generate JSON file", 0, "");
 			} // -----------readExt-------------
 			else {
 				hlpScreen(1);
@@ -190,11 +197,61 @@ public class FileSorterStarter {
 				metr.getTime("Data merged " + li + "rows to database file from " + args[1], li, "rows");
 				viparam = li;
 			} // ---------merge-------
+			else if (args[0].toUpperCase().trim().equals("-BAT")) {
+				// создаем пакетный BAT файл удаления ненужных копий
+				FSSQLDatabase dbs = null;
+				long li = 0;
+				try {
+					dbs = new FSSQLDatabase(dbName);
+					try {
+						li = dbs.genBatScript(args[1]);
+					} catch (Exception e) {
+						log.warning("Cannot generate BAT from DB ["+dbName+"]. Message: " + e.getMessage());
+					}
+				} catch (Exception e) {
+					log.warning("Cannot open connect to main DB ["+dbName+"] for generation BAT. Message: " + e.getMessage());
+				} finally {
+					if (dbs != null) {
+						dbs.closeDB();
+					}
+				}
+				metr.getTime("In BAT file " + li + " lines from " + args[1], li, "lines");
+				viparam = li;
+			} // ---------bat-------
 			else {
-				hlpScreen(1);
+				hlpScreen(2);
 				System.exit(0);
 			}
 			break;
+			
+		case 3: startStringWrite(args); 
+			if (args[0].toUpperCase().trim().equals("-PATH")) {
+			// записываем в базу данных новые предпочтительные расширения и пути
+			// их файла JSON
+			// Открываем базу
+			FSSQLDatabase dbs = null;
+			try {
+				dbs = new FSSQLDatabase(dbName);
+				try {
+					dbs.writeExtensionsDB(args[1].trim(),args[2].toUpperCase().trim());
+				} catch (SQLException e) {
+					log.warning("Cannot recorded paths to DB ["+dbName+"]. Message: " + e.getMessage());
+				}
+			} catch (Exception e) {
+				log.warning("Cannot open connect to DB ["+dbName+"]. Message: " + e.getMessage());
+			} finally {
+				if (dbs != null) {
+					dbs.closeDB();
+				}
+			}
+			metr.getTime("Paths for extensions recorded to DB from JSON file", 0, "");
+		} // -----------Path-------------
+		else {
+			hlpScreen(3);
+			System.exit(0);
+		}
+		break;
+		
 		default:
 			hlpScreen(0);
 			System.exit(0); // Show Help Screen
