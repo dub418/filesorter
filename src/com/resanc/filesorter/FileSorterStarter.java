@@ -25,7 +25,7 @@ public class FileSorterStarter {
 	// служебные внутренние свойства класса
 	private static Logger log = Logger.getLogger(FileSorterStarter.class.getName());
 	public static String dbName = "fsdb.s3db";
-	public static String version = "0.05 / 2015-09-30";
+	public static String version = "0.06 / 2015-10-03";
 
 	private static void prn(final String s) {
 		System.out.println(s);
@@ -204,6 +204,11 @@ public class FileSorterStarter {
 				try {
 					dbs = new FSSQLDatabase(dbName);
 					try {
+						dbs.dedupDB();
+					} catch (Exception e) {
+						log.warning("Cannot deduplicate before bat in DB. Message: " + e.getMessage());
+					}
+					try {
 						li = dbs.genBatScript(args[1]);
 					} catch (Exception e) {
 						log.warning("Cannot generate BAT from DB ["+dbName+"]. Message: " + e.getMessage());
@@ -218,7 +223,7 @@ public class FileSorterStarter {
 				metr.getTime("In BAT file " + li + " lines from " + args[1], li, "lines");
 				viparam = li;
 			} // ---------bat-------
-			else {
+			else{
 				hlpScreen(2);
 				System.exit(0);
 			}
@@ -262,7 +267,7 @@ public class FileSorterStarter {
 					+ totl.getTime("total time", 1, "program") + " msec.");
 		}
 		if (args.length == 2) {
-			System.out.println("Application finished with params: [" + args[0] + "] [" + args[1] + "] "
+			System.out.println("\r\nApplication finished with params: [" + args[0] + "] [" + args[1] + "] "
 					+ totl.getTime("total time", 1, "program") + " msec." + viparam + " files.");
 		}
 

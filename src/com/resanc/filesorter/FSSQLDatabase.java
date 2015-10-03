@@ -56,7 +56,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public class FSSQLDatabase {
 
-	private static boolean dbDebug = true;// режим отладочных сообщений на
+	private static boolean dbDebug = false;// режим отладочных сообщений на
 											// консоль
 	private static String dbFilename = "filesorterbase.s3db";
 	private static String dbLibGeneratorName = "FSSQLDatabase_ver_1";
@@ -205,6 +205,7 @@ public class FSSQLDatabase {
 		// носителях, по ней впоследствии формируется пакет bat на удаление
 		// файлов
 		p(3);
+		dbMainStmt.execute("drop table  if exists [doubles];");
 		dbMainStmt.execute("CREATE TABLE IF NOT EXISTS [doubles] (" + "[CheckSum] BIGINT NOT NULL,"
 				+ "[FileSize] BIGINT NOT NULL," + "[Cnt] BIGINT NOT NULL)");
 		// создаем вспомогательную таблицу, в которой собирается статистика
@@ -685,6 +686,28 @@ public class FSSQLDatabase {
 		return -1;
 	}// readFromDB
 
+	
+	private boolean inExtList(FSFileExtList extL, String ext, String path) {
+		boolean find = false;
+		String logs  = "";
+		if (path != null) {
+			if ((ext != null) && !(ext.equals(""))) {
+				for (FSFileExt extE : extL.extList) {
+					// System.out.println((batExt.get(idx).equals(ext.getExt()))+"&&"+
+					// (batPth.get(idx).indexOf(ext.getPath())));
+					if (ext.equals(extE.getExt()) && (path.indexOf(extE.getPath()) >= 0)) {
+						find = true;
+						logs = extE.toString();
+						break;
+					} // if ext
+				} // for extE
+			} // if ext not free
+		}
+		log.fine("for path "+path+" and ["+ext+"] result is "+find+" on "+logs);
+		return find;
+	}//inExtList
+	
+	
 	/**
 	 * Генерирует bat файл, содержащий строки для удаления дублированных файлов
 	 * 
@@ -695,6 +718,7 @@ public class FSSQLDatabase {
 	 * @throws IOException
 	 */
 	public long genBatScript(String fnBase) throws SQLException, IOException {
+		// инициализируем переменные
 		long ll = -1;
 		File fp1 = new File(dbFilenameWithoutExt + ".bat");
 		FileWriter fw = new FileWriter(fp1, true);
@@ -702,12 +726,13 @@ public class FSSQLDatabase {
 		extL1.extList = new ArrayList<FSFileExt>();
 		String sp = "\"";
 		p(8);
+		// работаем, если БД открыта и есть коннект
 		if ((dbIsConnected)) {
 			// Загружаем из таблицы БД предпочтительные пути для расширений
 			// файлов
 			ll = 0;
 			String req = "";
-			dbMainRes = dbMainStmt.executeQuery("SELECT * FROM [prefExt]");
+			dbMainRes = dbMainStmt.executeQuery("SELECT * FROM [prefExt] ORDER BY CNT DESC");
 			dbMainConn.commit();
 			p(9);
 			while (dbMainRes.next()) {
@@ -721,41 +746,8 @@ public class FSSQLDatabase {
 				extL1.extList.add(fex);
 				log.fine(ll++ + ". Read from DB " + fex.toString());
 			} // while
-
 			p(10);
-			// Заполняем таблицу дубликатов
-			req = "DELETE FROM [doubles]";
-			try {
-				dbMainPStmt.executeUpdate(req);
-				dbMainConn.commit();
-			} catch (SQLException ex) {
-				log.warning(
-						"Error in request " + req + " Message: " + ex.getMessage() + " SQLstate:" + ex.getSQLState());
-			}
-			
-			req="INSERT INTO [doubles] ([CheckSum],[FileSize],[Cnt])"+ 
-	   			"	SELECT  CheckSumCRC32 as CheckSum, Filesize as FileSize, count(shortname) as Cnt from filesTemp group by CheckSum,filesize having cnt>1 order by cnt desc";
-			try {
-				dbMainPStmt.executeUpdate(req);
-				dbMainConn.commit();
-			} catch (SQLException ex) {
-				log.warning(
-						"Error in request " + req + " Message: " + ex.getMessage() + " SQLstate:" + ex.getSQLState());
-			}
-			
-			// Запрашиваем данные дубликатов из таблицы БД
-			req = "SELECT * FROM [doubles] WHERE FileSize>(-1) ORDER BY FileSize DESC";
-			try {
-				dbMainRes = dbMainPStmt.executeQuery(req);
-				dbMainConn.commit();
-			} catch (SQLException ex) {
-				log.warning(
-						"Error in request " + req + " Message: " + ex.getMessage() + " SQLstate:" + ex.getSQLState());
-			} catch (Exception ex) {
-				log.warning("Error in request " + req + " Message: " + ex.getMessage());
-			}
 
-			p(11);
 			// Открываем файл скрипта удаления дублей
 			try {
 				if (!((fnBase == null) || (fnBase.equals("")))) {
@@ -770,59 +762,134 @@ public class FSSQLDatabase {
 				log.severe("File cannot created " + fp1.getCanonicalPath() + " Message: " + e.getMessage());
 			}
 
-			p(12);
-			// заполняем файл bat-скрипта
-			ResultSet res = null;
-			ll = 0;
-			while (dbMainRes.next()) {
-				long countFile = dbMainRes.getLong("Cnt");
-				long fileSize = dbMainRes.getLong("FileSize");
-				long checkSum = dbMainRes.getLong("CheckSum");
-				
-				req = "SELECT * FROM filesTemp WHERE FileSize=" + fileSize + " AND CheckSumCRC32=" + checkSum
-						+ " Order by ShortName DESC";
-				try {
-					res = dbMainPStmt.executeQuery(req);
-					dbMainConn.commit();
-				} catch (SQLException ex) {
-					log.severe("Error in request " + req + " Message: " + ex.getMessage() + " SQLstate:"
-							+ ex.getSQLState());
+			p(11);
 
-					// Создаем переменные, в которые помещаем строку результата
-					// запроса БД
-					String shortName = res.getString("ShortName");
-					String fullPath = res.getString("FullPath");
-					long fileSize1 = res.getLong("FileSize");
-					long checkSumCRC32 = res.getLong("CheckSumCRC32");
-					String dtLastModification = res.getString("dtLastModification");
-					String deviceSerial = res.getString("DeviceSerial");
-					String deviceComment = res.getString("DeviceComment");
-
-					String cmdPrefix = "DEL";
-					String firstPrefix = "REM";
-					String cmdLine = "";
-					String sp1 = "; ";
-					String sp2 = "\"";
-
-					ll++;
-
-					cmdLine = cmdPrefix + " " + sp2 + fullPath + sp2 + " :: " + " Size=" + fileSize1 + sp1 + "CRC32="
-							+ checkSumCRC32 + sp1 + "Modifyed=" + dtLastModification + sp1 + "Name=" + shortName + sp1
-							+ " on (" + deviceComment + " SN." + deviceSerial + ") #";
-					try {
-						fw.write(cmdLine + "\r\n");
-					} catch (FileNotFoundException e) {
-						log.severe("Error BAT file cannot write. File not exist. Message: " + e.getMessage());
-					} catch (IOException e) {
-						log.severe("Error BAT file cannot write. File not available. Message: " + e.getMessage());
-					}
-
-					System.out.println("    " + ll + ") " + cmdLine);
-				} // while write to fw
-				p(13);
-				
+			// Заполняем таблицу подсчета дубликатов по размерам и контрольным
+			// суммам
+			req = "INSERT INTO [doubles] ([CheckSum],[FileSize],[Cnt])"
+					+ "	SELECT  CheckSumCRC32 as CheckSum, Filesize as FileSize, count(shortname) as Cnt from filesTemp group by CheckSum,filesize having cnt>1 order by cnt desc;";
+			try {
+				dbMainStmt.executeUpdate(req);
+				dbMainConn.commit();
+			} catch (SQLException ex) {
+				log.warning(
+						"Error in request " + req + " Message: " + ex.getMessage() + " SQLstate:" + ex.getSQLState());
 			}
-			fw.close();
+
+			// Запрашиваем данные списка дубликатов из таблицы БД
+			req = "SELECT * FROM [doubles] WHERE FileSize>(-1) ORDER BY FileSize DESC;";
+			try {
+				dbMainRes = dbMainStmt.executeQuery(req);
+				dbMainConn.commit();
+
+               Statement stmt = dbMainConn.createStatement();
+				ResultSet res = null;
+				ll = 0;
+				while (dbMainRes.next()) {
+					long countFile = dbMainRes.getLong("Cnt");
+					long fileSize = dbMainRes.getLong("FileSize");
+					long checkSum = dbMainRes.getLong("CheckSum");
+					// массивы строк для файла bat-скрипта
+					ArrayList<String> batCmd = new ArrayList<String>();// Строки
+																		// команд
+																		// удаления
+					ArrayList<String> batRem = new ArrayList<String>();// Строки
+																		// комментариев
+					ArrayList<String> batExt = new ArrayList<String>();// Строки
+																		// расширений
+																		// файлов
+					ArrayList<String> batPth = new ArrayList<String>();// Строки
+																		// путей
+																		// файлов
+	 
+					req = "SELECT * FROM filesTemp WHERE FileSize=" + fileSize + " AND CheckSumCRC32=" + checkSum
+							+ " Order by ShortName DESC";
+					// System.out.println(req + " Doo");
+					try { 
+						res = stmt.executeQuery(req);
+						dbMainConn.commit();
+					} catch (SQLException ex) {
+						log.severe("Error in request " + req + " Message: " + ex.getMessage() + " SQLstate:"
+								+ ex.getSQLState());
+					}
+					//новая группа строк, содержащая описание файлов дубликатов считана из таблицы БД, теперь ее надо разбирать и искать строку с оригиналом
+					fw.write("\r\n");
+					fw.write("REM * * * * * * * * * * * * * new doubles file group * * * * * * * * * * * * *\r\n");		
+					fw.write("REM * * * * * * * * CRC32:"+checkSum+", "+fileSize+" bytes, Count:"+countFile+"\r\n");
+					
+					while (res.next()) {
+						// Создаем переменные, в которые помещаем строку
+						// результата
+						// запроса БД
+						String shortName = res.getString("ShortName");
+						String fullPath = res.getString("FullPath");
+						long fileSize1 = res.getLong("FileSize");
+						long checkSumCRC32 = res.getLong("CheckSumCRC32");
+						String dtLastModification = res.getString("dtLastModification");
+						String deviceSerial = res.getString("DeviceSerial");
+						String deviceComment = res.getString("DeviceComment");
+						String fileExt = res.getString("FileExt");
+
+						String cmdPrefix = "DEL";
+						String firstPrefix = "REM";
+						String cmdLine = "";
+						String sp1 = "; ";
+						String sp2 = "\"";
+
+						ll++;
+
+						batPth.add(fullPath);
+						batCmd.add(cmdPrefix + " " + sp2 + fullPath + shortName + sp2);
+						batRem.add(dtLastModification + " CRC:" + checkSumCRC32 + sp1 + fileSize1 +" bytes"+ sp1+ fullPath+shortName+ sp1  + " on ("
+								+ deviceComment + " SN." + deviceSerial+")");
+						batExt.add(fileExt);
+
+						//cmdLine = cmdPrefix + " " + sp2 + fullPath + sp2 + " :: " + " Size=" + fileSize1 + sp1
+						//		+ "CRC32=" + checkSumCRC32 + sp1 + "Modifyed=" + dtLastModification + sp1 + "Name="
+						//		+ shortName + sp1 + " on (" + deviceComment + " SN." + deviceSerial + ") #";
+						p(13);
+						fw.write("REM * * * "+batRem.get(batRem.size()-1)+" No."+ll+"\r\n");
+
+						//System.out.println(" " + ll + ") " + cmdLine);
+					} // while res write to fw
+					res.close();
+					stmt.close();
+					p(14);
+					// по умолчанию первый найденный признаем оригиналом и
+					// проверяем приоритетные пути для сохранения оригинала по
+					// этому пути
+					int origin = 0;
+					for (int idx=0; idx<batPth.size();idx++) {
+						// если попалось расширение, то это оригинала и выходим
+						if (inExtList(extL1,batExt.get(idx),batPth.get(idx))) {origin=idx; break;} 	
+					}
+					//System.out.println("Orig. is " + origin + ". " + batCmd.get(origin) + " *** " + batRem.get(origin));
+					//записываем строки в файл
+					fw.write("REM\r\n");
+					for (int idx=0; idx<batPth.size();idx++) {
+						try {
+							//fw.write("\r\n");
+							//fw.write("REM * * * * * * * * * * * * new doubles file group * * * * * * * * * * * *\r\n");						   
+							//fw.write(batRem.get(idx) + "\r\n");
+							if (idx!=origin) {fw.write(batCmd.get(idx) + "\r\n");}
+							else {fw.write("REM !!!Origin File!!! " +batCmd.get(idx) + "\r\n"); }							
+						} catch (FileNotFoundException e) {
+							log.severe("Error BAT file cannot write. File not exist. Message: " + e.getMessage());
+						} catch (IOException e) {
+							log.severe("Error BAT file cannot write. File not available. Message: " + e.getMessage());
+						}	
+						}//for iBatPth
+				} // dbMainRes while
+				fw.close();
+			} catch (SQLException ex) {
+				log.warning(
+						"Error in request " + req + " Message: " + ex.getMessage() + " SQLstate:" + ex.getSQLState());
+			} catch (Exception ex) {
+				log.warning("Error in request " + req + " Message: " + ex.getMessage());
+			}
+
+			p(20);
+
 		} // if db
 		else {
 			log.warning("Application can not write bat file because database connection disable.");
