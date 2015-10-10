@@ -25,7 +25,7 @@ public class FileSorterStarter {
 	// служебные внутренние свойства класса
 	private static Logger log = Logger.getLogger(FileSorterStarter.class.getName());
 	public static String dbName = "fsdb.s3db";
-	public static String version = "0.06 / 2015-10-03";
+	public static String version = "0.07 / 2015-10-10";
 
 	private static void prn(final String s) {
 		System.out.println(s);
@@ -47,6 +47,7 @@ public class FileSorterStarter {
 		prn("                 Option NEW - delete all previous extensions ; ");
 		prn("                 Option ADD - adds new to previous extensions; ");
 		prn("           BAT   - generate BAT-file to delete duplicates;                   ");
+		prn("           LIB   - scan library of text documents;                           ");
 		prn("                                                                             ");
 		prn("           The main database file is "+dbName);
 		prn("=============================================================================");
@@ -135,6 +136,12 @@ public class FileSorterStarter {
 				}
 				metr.getTime("Read Exts in database file and generate JSON file", 0, "");
 			} // -----------readExt-------------
+			else if (args[0].toUpperCase().trim().equals("-LIB")) {
+					FSTextFileList fst=new FSTextFileList();
+					fst.getFilesFromDisc("c:\\cl");
+					metr.getTime("Scan Library Of Text Files", 0, "");
+				} // -----------lib-------------
+			
 			else {
 				hlpScreen(1);
 				System.exit(0);
