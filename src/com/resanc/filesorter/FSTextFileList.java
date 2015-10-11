@@ -1,10 +1,16 @@
 package com.resanc.filesorter;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 
 import com.itextpdf.text.pdf.PdfReader;
 import com.itextpdf.text.pdf.parser.PdfTextExtractor;
@@ -22,12 +28,51 @@ public class FSTextFileList {
 		return 1;
 	}
 	
+	/**
+	 * Читает файлы формата офисе doc/docx
+	 * 
+	 * @param fn
+	 */
+	public String getDocFileText(String fn, boolean docx) {
+		File file = null;
+		WordExtractor extractor = null;
+		XWPFWordExtractor xextractor = null;
+		String res = "";
+		try {
+			file = new File(fn);
+			FileInputStream fis = new FileInputStream(file.getAbsolutePath());
+			if (docx) {
+				HWPFDocument document = new HWPFDocument(fis);
+				extractor = new WordExtractor(document);
+				String[] fileData = extractor.getParagraphText();
+				for (int i = 0; i < fileData.length; i++) {
+					if (fileData[i] != null) {
+						res = res + fileData[i];
+						System.out.println(fileData[i]);
+					}
+				}
+			} else {
+				XWPFDocument document = new XWPFDocument(fis);
+				xextractor = new XWPFWordExtractor(document);
+				String fileData = xextractor.getText();
+				System.out.println(fileData);
+				// .getText();// .getParagraphText();
+			}
+			fis.close();
+			// file.close();
+		} catch (Exception exep) {
+			exep.printStackTrace();
+		}
+		return res;
+	}
+	
+	
     /**Читает текст из pdf файла построчно. Использует iText и BouncyCastle
      * @param fn
      * @return
      * @throws IOException
      */
-    private String getPdfFileText(String fn) throws IOException
+    public String getPdfFileText(String fn) throws IOException
     {
     	        String text="";
     			// считаем, что программе передается один аргумент - имя файла
@@ -70,7 +115,15 @@ public class FSTextFileList {
 								String txt=this.getPdfFileText(fElem.getCanonicalPath()); 
 								System.out.println("---------------------------------------------------=");
 								}catch (Exception e){System.out.println("Error "+e.getMessage());}
-								}
+								}//pdf
+								if (ext1.equals(".doc")||ext1.equals(".docx")) {
+									System.out.println(ext1+" "+fElem.getCanonicalPath());
+									System.out.println("---------------------------------------------------+");
+									try {
+									String txt=this.getDocFileText(fElem.getCanonicalPath(),(ext1.equals(".docx"))); 
+									System.out.println("---------------------------------------------------=");
+									}catch (Exception e){System.out.println("Error "+e.getMessage());}
+									}//doc/docx
 							} catch (IOException ex) {
 								log.severe("I/O Error in file list. ErrorMsg = " + ex.getMessage());
 							}
