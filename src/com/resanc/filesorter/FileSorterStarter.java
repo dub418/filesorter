@@ -48,6 +48,7 @@ public class FileSorterStarter {
 		prn("                 Option ADD - adds new to previous extensions; ");
 		prn("           BAT   - generate BAT-file to delete duplicates;                   ");
 		prn("           LIB   - scan library of text documents;                           ");
+		prn("           UNZIP - unpack zip archive file;                                  ");
 		prn("                                                                             ");
 		prn("           The main database file is "+dbName);
 		prn("=============================================================================");
@@ -230,6 +231,35 @@ public class FileSorterStarter {
 				metr.getTime("In BAT file " + li + " lines from " + args[1], li, "lines");
 				viparam = li;
 			} // ---------bat-------
+			else if (args[0].toUpperCase().trim().equals("-UNZIP")) {
+				// распаковываем архивный файл
+				FSZipArc zip=new FSZipArc();
+				zip.unpack(args[1], "c:/01_fs/unpack/");
+				zip.getStructFb2("sss");
+				FSSQLDatabase dbs = null;
+				long li = 0;
+				/*try {
+					dbs = new FSSQLDatabase(dbName);
+					try {
+						dbs.dedupDB();
+					} catch (Exception e) {
+						log.warning("Cannot deduplicate before bat in DB. Message: " + e.getMessage());
+					}
+					try {
+						li = dbs.genBatScript(args[1]);
+					} catch (Exception e) {
+						log.warning("Cannot generate BAT from DB ["+dbName+"]. Message: " + e.getMessage());
+					}
+				} catch (Exception e) {
+					log.warning("Cannot open connect to main DB ["+dbName+"] for generation BAT. Message: " + e.getMessage());
+				} finally {
+					if (dbs != null) {
+						dbs.closeDB();
+					}
+				}*/
+				metr.getTime("In BAT file " + li + " lines from " + args[1], li, "lines");
+				viparam = li;
+			} // ---------unzip-------
 			else{
 				hlpScreen(2);
 				System.exit(0);
