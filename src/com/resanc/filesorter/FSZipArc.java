@@ -15,6 +15,8 @@ import java.net.URI;
 import java.util.Deque;
 import java.util.Enumeration;
 import java.util.LinkedList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -38,8 +40,10 @@ import org.xml.sax.SAXException;
  */
 public class FSZipArc {
 	public File directory; // folder for result files
+	// служебные внутренние свойства класса
+		private static Logger log = Logger.getLogger(FSZipArc.class.getName());
 
-	public static void pack(File directory, String to) throws IOException {
+	public  void pack(File directory, String to) throws IOException {
 		URI base = directory.toURI();
 		Deque<File> queue = new LinkedList<File>();
 		queue.push(directory);
@@ -105,6 +109,157 @@ public class FSZipArc {
 		}
 		zip.close();
 	}
+	
+	public void getFb2FilesDigest(File fp)
+	{
+		File[] fpFiles = fp.listFiles();
+			// проверка входных параметров, что они не указывают null (папки нижнего
+			// уровня без файлов содержат нулевые списки входящих файлов)
+			if (fp != null) {
+				if (fpFiles != null) {
+					for (File fElem : fpFiles) {
+						// проверка на нулевые указатели
+						if (fElem != null) {
+							// обработка для файлов
+							if (fElem.isFile()) {
+								//вытаскиваем дайджест из файла
+								pp("here "+fElem.getAbsolutePath());
+								getFb2Digest(fElem);
+								}
+							}
+							// обработка для папок
+							if (fElem.isDirectory()) {
+								try {
+									getFb2FilesDigest(fElem); 
+								} catch (Exception ex) {
+									log.severe("Recursion problem with addition to file list. Params: " + fElem.toString()
+											+ "\r\n Trace = " + ex.toString() + " ErrorMsg = " + ex.getMessage());
+								}
+							} // обр.папок
+					} // for
+				} // fpFiles
+			} // fp
+	}
+	private  int lip=0;
+    private  void pp( String ss){
+    	if (ss!=null) {System.out.println(lip++ +") "+ss);}else { System.out.println(lip++);}}
+	public  void getFb2Digest(File fp) {
+		pp(" xxx "+fp.getAbsolutePath());
+		if (fp!=null){ 
+		try {
+	            FileInputStream file = new FileInputStream(fp);
+	                 
+	            DocumentBuilderFactory builderFactory = DocumentBuilderFactory.newInstance();
+	             
+	            DocumentBuilder builder =  builderFactory.newDocumentBuilder();
+	             
+	            Document xmlDocument = builder.parse(file);
+	 
+	            XPath xPath =  XPathFactory.newInstance().newXPath();
+	 
+	            System.out.println("*1************************");
+	            String expression = "/FictionBook[@xmlns='http://www.gribuser.ru/xml/fictionbook/2.0']/description";
+	            System.out.println(expression);
+	            String email1 = xPath.compile(expression).evaluate(xmlDocument);
+	            System.out.println(email1);
+	            
+	            System.out.println("*************************");
+	            expression = "/Employees/Employee[@emplid='3333']/email";
+	            System.out.println(expression);
+	            String email = xPath.compile(expression).evaluate(xmlDocument);
+	            System.out.println(email);
+	 
+	            System.out.println("*************************");
+	            expression = "/FictionBook/description/title-info/book-title";
+	            System.out.println(expression);
+	            NodeList nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            }
+
+	            System.out.println("*************************");
+	            expression = "/FictionBook/description/title-info/genre";
+	            System.out.println(expression);
+	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            }
+	            
+	            System.out.println("*************************");
+	            expression = "/FictionBook/description/title-info/annotation";
+	            System.out.println(expression);
+	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            }
+	            
+	            System.out.println("*************************");
+	            expression = "/Employees/Employee[@type='admin']/firstname";
+	            System.out.println(expression);
+	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            }
+	 
+	            System.out.println("*************************");
+	            expression = "/Employees/Employee[@emplid='2222']";
+	            System.out.println(expression);
+	            Node node = (Node) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODE);
+	            if(null != node) {
+	                nodeList = node.getChildNodes();
+	                for (int i = 0;null!=nodeList && i < nodeList.getLength(); i++) {
+	                    Node nod = nodeList.item(i);
+	                    if(nod.getNodeType() == Node.ELEMENT_NODE)
+	                        System.out.println(nodeList.item(i).getNodeName() + " : " + nod.getFirstChild().getNodeValue()); 
+	                }
+	            }
+	             
+	            System.out.println("*************************");
+	 
+	            expression = "/Employees/Employee[age>40]/firstname";
+	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            System.out.println(expression);
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            }
+	         
+	            System.out.println("*************************");
+	            expression = "/Employees/Employee[1]/firstname";
+	            System.out.println(expression);
+	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            }
+	            System.out.println("*************************");
+	            expression = "/Employees/Employee[position() <= 2]/firstname";
+	            System.out.println(expression);
+	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            }
+	 
+	            System.out.println("*************************");
+	            expression = "/Employees/Employee[last()]/firstname";
+	            System.out.println(expression);
+	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            }
+	 
+	            System.out.println("*************************");
+	 
+	        } catch (FileNotFoundException e) {
+	            e.printStackTrace();
+	        } catch (SAXException e) {
+	            e.printStackTrace();
+	        } catch (IOException e) {
+	            e.printStackTrace();
+	        } catch (ParserConfigurationException e) {
+	            e.printStackTrace();
+	        } catch (XPathExpressionException e) {
+	            e.printStackTrace();
+	        }       }
+	    }
 
 	public static void getStructFb2(String fn) {
 		 try {
