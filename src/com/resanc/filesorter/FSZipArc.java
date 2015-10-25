@@ -18,6 +18,7 @@ import java.util.LinkedList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
@@ -40,6 +41,7 @@ import org.xml.sax.SAXException;
  */
 public class FSZipArc {
 	public File directory; // folder for result files
+	private File TempDirectory;// folder for temporary files
 	// служебные внутренние свойства класса
 		private static Logger log = Logger.getLogger(FSZipArc.class.getName());
 
@@ -84,7 +86,54 @@ public class FSZipArc {
 			res.close();
 		}
 	}
-
+	
+	private static String FS_ZIP_TEMP_DIR="TempUnpackDir";
+	public static File unpackTempDirectory=null;
+	
+	public static int unpack(File fpath) {
+		System.out.println("unpack started...");
+		int res=-1;
+		File ftmp = new File(FS_ZIP_TEMP_DIR);
+		ftmp.mkdir();
+		unpackTempDirectory = ftmp;
+		
+		try {
+			System.out.println("ftmp="+ftmp.getCanonicalPath());
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		//пытаемся распаковать архив в эту временную папку
+		try {
+		ZipFile zip = new ZipFile(fpath);
+		Enumeration entries = zip.entries();
+		LinkedList<ZipEntry> zfiles = new LinkedList<ZipEntry>();
+		while (entries.hasMoreElements()) {
+			ZipEntry entry = (ZipEntry) entries.nextElement();
+			if (entry.isDirectory()) {
+				new File(FS_ZIP_TEMP_DIR + "/" + entry.getName()).mkdir();
+			} else {
+				zfiles.add(entry);
+			}
+		}
+		for (ZipEntry entry : zfiles) {
+			InputStream in = zip.getInputStream(entry);
+			OutputStream out = new FileOutputStream(FS_ZIP_TEMP_DIR + "/" + entry.getName());
+			byte[] buffer = new byte[1024];
+			int len;
+			while ((len = in.read(buffer)) >= 0)
+				out.write(buffer, 0, len);
+			in.close();
+			out.close();
+		}
+		zip.close();
+		res=0;}
+		catch (ZipException e){}
+		catch (IOException e){}
+		catch (SecurityException e){}
+		return res;
+	}
+	
 	public static void unpack(String path, String dir_to) throws IOException {
 		ZipFile zip = new ZipFile(path);
 		Enumeration entries = zip.entries();
@@ -109,10 +158,56 @@ public class FSZipArc {
 		}
 		zip.close();
 	}
+
+	/**Просматривает указанную папку и подпапки, находит в них zip и fb2, 
+	 * управляет извлечением строк-дайджестов из них
+	 * @param fp
+	 */
+	public void getFb2DigestList(File fp)
+	{
+		pp("Начинаем обходить папку и искать в ней архивы и книги. Путь начала: "+fp.toString());
+		File[] fpFiles = fp.listFiles();
+			// проверка входных параметров, что они не указывают null (папки нижнего
+			// уровня без файлов содержат нулевые списки входящих файлов)
+			if (fp != null) {
+				if (fpFiles != null) {
+					pp("       fpFiles");
+					for (File fElem : fpFiles) {
+						// проверка на нулевые указатели
+						if (fElem != null) {
+							// обработка для файлов
+							if (fElem.isFile()) {
+								pp("               try unpack "+fElem.toString());
+								//Если это zip архив, вытаскиваем его содержимое во временную папку
+								if (unpack(fElem)==0){
+									//Вытащить дайджесты из всех файлов из временной папки
+									pp("here zip is "+fElem.getAbsolutePath());
+									getDigestsFromFb2Directory(new File(FS_ZIP_TEMP_DIR));
+									//Удалить временную папку со всеми файлами
+								}
+								//Если это fb2 файл, вытаскиваем из него дайджест
+								pp("here fb2 is "+fElem.getAbsolutePath());
+								getFb2Digest(fElem);
+								}
+							}
+							// обработка для папок
+							if (fElem.isDirectory()) {
+								try {
+									getFb2DigestList(fElem); 
+								} catch (Exception ex) {
+									log.severe("Recursion problem with addition to file list. Params: " + fElem.toString()
+											+ "\r\n Trace = " + ex.toString() + " ErrorMsg = " + ex.getMessage());
+								}
+							} // обр.папок
+					} // for
+				} // fpFiles
+			} // fp
+	}
 	
-	public void getFb2FilesDigest(File fp)
+	public void getDigestsFromFb2Directory(File fp)
 	{
 		File[] fpFiles = fp.listFiles();
+		pp("Blbla "+fp.toString());
 			// проверка входных параметров, что они не указывают null (папки нижнего
 			// уровня без файлов содержат нулевые списки входящих файлов)
 			if (fp != null) {
@@ -123,14 +218,14 @@ public class FSZipArc {
 							// обработка для файлов
 							if (fElem.isFile()) {
 								//вытаскиваем дайджест из файла
-								pp("here "+fElem.getAbsolutePath());
+								pp("here getDigestsFromFb2Directory "+fElem.getAbsolutePath());
 								getFb2Digest(fElem);
 								}
 							}
 							// обработка для папок
 							if (fElem.isDirectory()) {
 								try {
-									getFb2FilesDigest(fElem); 
+									getDigestsFromFb2Directory(fElem); 
 								} catch (Exception ex) {
 									log.severe("Recursion problem with addition to file list. Params: " + fElem.toString()
 											+ "\r\n Trace = " + ex.toString() + " ErrorMsg = " + ex.getMessage());
@@ -143,10 +238,15 @@ public class FSZipArc {
 	private  int lip=0;
     private  void pp( String ss){
     	if (ss!=null) {System.out.println(lip++ +") "+ss);}else { System.out.println(lip++);}}
-	public  void getFb2Digest(File fp) {
-		pp(" xxx "+fp.getAbsolutePath());
+      
+	public  FSDescriptionBook getFb2Digest(File fp) {
+
+		String fn = "";
+		FSDescriptionBook fbook = new FSDescriptionBook();
 		if (fp!=null){ 
 		try {
+				fn = fp.getCanonicalPath();
+			
 	            FileInputStream file = new FileInputStream(fp);
 	                 
 	            DocumentBuilderFactory builderFactory = DocumentBuilderFactory.newInstance();
@@ -154,111 +254,90 @@ public class FSZipArc {
 	            DocumentBuilder builder =  builderFactory.newDocumentBuilder();
 	             
 	            Document xmlDocument = builder.parse(file);
-	 
-	            XPath xPath =  XPathFactory.newInstance().newXPath();
-	 
-	            System.out.println("*1************************");
-	            String expression = "/FictionBook[@xmlns='http://www.gribuser.ru/xml/fictionbook/2.0']/description";
-	            System.out.println(expression);
-	            String email1 = xPath.compile(expression).evaluate(xmlDocument);
-	            System.out.println(email1);
 	            
-	            System.out.println("*************************");
-	            expression = "/Employees/Employee[@emplid='3333']/email";
-	            System.out.println(expression);
-	            String email = xPath.compile(expression).evaluate(xmlDocument);
-	            System.out.println(email);
-	 
-	            System.out.println("*************************");
-	            expression = "/FictionBook/description/title-info/book-title";
-	            System.out.println(expression);
+	            XPath xPath =  XPathFactory.newInstance().newXPath();
+	            
+	            //*Заголовок*
+	            String expression = "/FictionBook/description/title-info/book-title";
 	            NodeList nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
 	            for (int i = 0; i < nodeList.getLength(); i++) {
-	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	                fbook.setFullTitle(nodeList.item(i).getFirstChild().getNodeValue());
 	            }
-
-	            System.out.println("*************************");
+	            
+	            //*Аннотация*
+	            expression = "/FictionBook/description/title-info/annotation/p";
+	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
+	            String s="";
+	            for (int i = 0; i < nodeList.getLength(); i++) {
+	                s=s+" "+nodeList.item(i).getFirstChild().getNodeValue(); 
+	            }
+	            fbook.setFullAnnotation(s);
+	            
+	            //*Жанр*
 	            expression = "/FictionBook/description/title-info/genre";
-	            System.out.println(expression);
 	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
 	            for (int i = 0; i < nodeList.getLength(); i++) {
-	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            	fbook.addGenre(nodeList.item(i).getFirstChild().getNodeValue()); 
 	            }
 	            
-	            System.out.println("*************************");
-	            expression = "/FictionBook/description/title-info/annotation";
-	            System.out.println(expression);
+	            //*Автор фамилия*
+	            expression = "/FictionBook/description/title-info/author/last-name";
 	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
 	            for (int i = 0; i < nodeList.getLength(); i++) {
-	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	            	fbook.addAuthorsFamily(nodeList.item(i).getFirstChild().getNodeValue()); 
 	            }
 	            
-	            System.out.println("*************************");
-	            expression = "/Employees/Employee[@type='admin']/firstname";
-	            System.out.println(expression);
+	            //*Автор имя*
+	            expression = "/FictionBook/description/title-info/author/first-name";
 	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
 	            for (int i = 0; i < nodeList.getLength(); i++) {
-	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	                fbook.addAuthorsName(nodeList.item(i).getFirstChild().getNodeValue(),i); 
 	            }
-	 
-	            System.out.println("*************************");
-	            expression = "/Employees/Employee[@emplid='2222']";
-	            System.out.println(expression);
-	            Node node = (Node) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODE);
-	            if(null != node) {
-	                nodeList = node.getChildNodes();
-	                for (int i = 0;null!=nodeList && i < nodeList.getLength(); i++) {
-	                    Node nod = nodeList.item(i);
-	                    if(nod.getNodeType() == Node.ELEMENT_NODE)
-	                        System.out.println(nodeList.item(i).getNodeName() + " : " + nod.getFirstChild().getNodeValue()); 
-	                }
-	            }
-	             
-	            System.out.println("*************************");
-	 
-	            expression = "/Employees/Employee[age>40]/firstname";
+	            
+	            //*Ключевые слова*
+	            expression = "/FictionBook/description/title-info/keywords";
 	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
-	            System.out.println(expression);
+	            s="";
 	            for (int i = 0; i < nodeList.getLength(); i++) {
-	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	                s=s+nodeList.item(i).getFirstChild().getNodeValue(); 
 	            }
-	         
-	            System.out.println("*************************");
-	            expression = "/Employees/Employee[1]/firstname";
-	            System.out.println(expression);
+	            fbook.setKeywords(s);
+	            
+	            //*Язык*
+	            expression = "/FictionBook/description/title-info/lang";
 	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
 	            for (int i = 0; i < nodeList.getLength(); i++) {
-	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	                fbook.setLang(nodeList.item(i).getFirstChild().getNodeValue()); 
 	            }
-	            System.out.println("*************************");
-	            expression = "/Employees/Employee[position() <= 2]/firstname";
-	            System.out.println(expression);
+	            
+	            //*Язык оригинала*
+	            expression = "/FictionBook/description/title-info/src-lang";
 	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
 	            for (int i = 0; i < nodeList.getLength(); i++) {
-	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
+	                fbook.setSrcLang(nodeList.item(i).getFirstChild().getNodeValue()); 
 	            }
-	 
-	            System.out.println("*************************");
-	            expression = "/Employees/Employee[last()]/firstname";
-	            System.out.println(expression);
-	            nodeList = (NodeList) xPath.compile(expression).evaluate(xmlDocument, XPathConstants.NODESET);
-	            for (int i = 0; i < nodeList.getLength(); i++) {
-	                System.out.println(nodeList.item(i).getFirstChild().getNodeValue()); 
-	            }
-	 
-	            System.out.println("*************************");
-	 
+	            
+	            //*Закрываем данные в записи и выводим строкой*
+	            fbook.prepareData(); 
+	            System.out.println("** "+fbook.toCSVString());
+	 	 
 	        } catch (FileNotFoundException e) {
-	            e.printStackTrace();
+	            log.warning(fn+" Error: File Not Found. Msg: "+e.getMessage());
+	        	//e.printStackTrace();
 	        } catch (SAXException e) {
-	            e.printStackTrace();
+	        	log.warning(fn+" Error SAX. Msg: "+e.getMessage());
+	            //e.printStackTrace();
 	        } catch (IOException e) {
-	            e.printStackTrace();
+	        	log.warning(fn+" I/O Error. Msg: "+e.getMessage());
+	            //e.printStackTrace();
 	        } catch (ParserConfigurationException e) {
-	            e.printStackTrace();
+	        	log.warning(fn+" Parser Configuration Error. Msg: "+e.getMessage());
+	            //e.printStackTrace();
 	        } catch (XPathExpressionException e) {
-	            e.printStackTrace();
+	        	log.warning(fn+" XPath Error. Msg: "+e.getMessage());
+	            //e.printStackTrace();
 	        }       }
+		return fbook;
 	    }
 
 	public static void getStructFb2(String fn) {

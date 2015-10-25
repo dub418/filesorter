@@ -235,9 +235,12 @@ public class FileSorterStarter {
 				// распаковываем архивный файл
 				FSZipArc zip=new FSZipArc();
 				File zf = new File("c:/01_fs/unpack/");
-				zip.unpack(args[1], "c:/01_fs/unpack/");
+				File zf1 = new File("c:/01_fs/");
+				
+				//zip.unpack(args[1], "c:/01_fs/unpack/");
+				zip.getFb2DigestList(zf1);
 				//zip.getStructFb2("sss");
-				zip.getFb2FilesDigest(zf);
+				//zip.getDigestsFromFb2Directory(zf);
 				FSSQLDatabase dbs = null;
 				long li = 0;
 				/*try {
