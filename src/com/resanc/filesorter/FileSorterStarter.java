@@ -236,7 +236,11 @@ public class FileSorterStarter {
 				FSZipArc zip=new FSZipArc();
 				File zf = new File("c:/01_fs/unpack/");
 				File zf1 = new File("c:/01_fs/");
+				File fb2demo = new File("c:/01_fs/testfb2.fb2");
+				File fb2demoBad = new File("c:/01_fs/tsd.json");
 				
+				//zip.getFb2Digest(fb2demo, false, "zipNam");
+				//zip.getFb2Digest(fb2demoBad, false, "zipNam");
 				//zip.unpack(args[1], "c:/01_fs/unpack/");
 				zip.getFb2DigestList(zf1);
 				//zip.getStructFb2("sss");
