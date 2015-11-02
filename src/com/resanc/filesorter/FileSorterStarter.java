@@ -25,7 +25,8 @@ public class FileSorterStarter {
 	// служебные внутренние свойства класса
 	private static Logger log = Logger.getLogger(FileSorterStarter.class.getName());
 	public static String dbName = "fsdb.s3db";
-	public static String version = "0.07 / 2015-10-10";
+//	public static String version = "0.07 / 2015-10-10";
+	public static String version = "0.08 / 2015-11-02";
 
 	private static void prn(final String s) {
 		System.out.println(s);
@@ -234,7 +235,7 @@ public class FileSorterStarter {
 			else if (args[0].toUpperCase().trim().equals("-UNZIP")) {
 				// распаковываем архивный файл
 				FSZipArc zip=new FSZipArc();
-				File zf = new File("c:/01_fs/unpack/");
+				File zf = new File(args[1]);
 				File zf1 = new File("c:/01_fs/");
 				File fb2demo = new File("c:/01_fs/testfb2.fb2");
 				File fb2demoBad = new File("c:/01_fs/tsd.json");
@@ -242,7 +243,7 @@ public class FileSorterStarter {
 				//zip.getFb2Digest(fb2demo, "zipNam");
 				//zip.getFb2Digest(fb2demoBad, false, "zipNam");
 				//zip.unpack(args[1], "c:/01_fs/unpack/");
-				zip.getFb2DigestList(zf1);
+				zip.getFb2DigestList(zf);
 				//zip.getStructFb2("sss");
 				//zip.getDigestsFromFb2Directory(zf);
 				FSSQLDatabase dbs = null;
@@ -266,7 +267,7 @@ public class FileSorterStarter {
 						dbs.closeDB();
 					}
 				}*/
-				metr.getTime("In BAT file " + li + " lines from " + args[1], li, "lines");
+				metr.getTime("In LOGFB2 UNZIP file " + li + " lines from " + args[1], li, "lines");
 				viparam = li;
 			} // ---------unzip-------
 			else{
