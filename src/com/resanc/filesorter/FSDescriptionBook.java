@@ -116,7 +116,8 @@ public class FSDescriptionBook {
 	public String toCSVString() {
 		String sp = "#";
 		return this.fullTitle + sp + this.fullAuthor + sp + this.keywords + sp + this.fullGenre + sp + this.lang + sp
-				+ this.srcLang + sp + this.zipName + sp + this.fileName + sp + this.fullAnnotation;
+				+ this.srcLang + sp + this.zipName + sp + this.fileName + sp 
+				+ this.fullAnnotation;
 	}
 
 	public void addGenre(String s) {
